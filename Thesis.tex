@@ -191,6 +191,9 @@ allocated on the heap.
 
 This report describes the implementation of Rust's memory safety checker, called
 the borrow checker, in an embedded Datalog engine, as well as its optimisation.
+In practice, the full analysis encompasses a variable liveness analysis,
+initialisation and deinitialisation tracking, and may-reference analysis for
+validation of Rust's memory safety guarantees.
 
 \fixme{mention results.}
 
@@ -369,15 +372,15 @@ When Rust's variables go out of scope, they are implicitly deallocated, or
 dropped in Rust parlance. Explicit deallocation is also possible by calling the
 function \InRust{drop()}, which takes ownership of a variable and performs
 deallocation, or, for complex objects, calls the \InRust{drop()} method. For
-some types of variables, such as integers, deallocation is not necessary and the
-compiler generates no actual \InRust{drop()}:s.
+some types such as integers, deallocation is not necessary and the
+compiler generates no actual \InRust{drop()}:s in the MIR.
 
-Rust provides a default deallocation method for data structures, but it can be
+Rust provides a default deallocator for data structures, but it can be
 overridden. This has repercussions on liveness calculations, because while the
 default deallocator for an object never needs to access its fields, a custom
 deallocator might access any of them. This means that any conditions of a loan
 that resulted in a reference $r$ stored in a \InRust{struct} instance $a$ must
-only be respected as far as \InRust{drop(a)} is concerned if $s$ implements a
+only be respected as far as \InRust{a.drop()} is concerned if $s$ implements a
 custom deallocator. If it does not, the loan of $r$ may be safely violated, as
 the default deallocator never dereferences $r$ and thus doesn't require $r$ to
 be valid. An illustration of this can be seen in
@@ -446,7 +449,8 @@ fn main() {
   borrow $B$ starting at the point $P$ (this is usually the point \emph{after} a
   borrow rvalue).
   
-\item[\InDatalog{universal_region(R)}] \fixme{this is a "free region" within fn body}
+\item[\InDatalog{universal_region(R)}] this is a "free region" within fn body
+  \fixme{what the heck is a free region}
   
 \item[\InDatalog{cfg_edge(P,Q)}] whenever there is a relation $P \rightarrow Q$
   in the control flow graph.
@@ -454,7 +458,8 @@ fn main() {
 \item[\InDatalog{killed(B,P)}] when some prefix of the path borrowed at $B$ is
   assigned at point $P$.
     
-\item[\InDatalog{outlives(R1, R2, P)}] \fixme{when we require `R1@P: R2@P`}
+\item[\InDatalog{outlives(R1, R2, P)}] when we require `R1@P: R2@P`
+  \fixme{better description, use set membership notation}
     
 \item[\InDatalog{invalidates(P, L)}] when the loan $L$ is invalidated at point $P$.
     
@@ -498,7 +503,8 @@ Both of these are then used to calculate the reference liveness relation, which
 serves as input for the rest of the borrow checker. A given RefProv $r$ is live
 at some point $p$ if it is in the type of a variable $v$ which is either
 drop-live or use-live at $p$, with some notable caveats for drop-liveness
-discussed in Section~\ref{sec:deall-as-spec}.
+(discussed in Section~\ref{sec:deall-as-spec}) embedded in the
+\InDatalog{var_drops_region} relation.
 
 \begin{minted}{prolog}
 region_live_at(R, P) :-
@@ -510,6 +516,8 @@ region_live_at(R, P) :-
         var_uses_region(V, R).
 \end{minted}
 
+\subsection{Variable Initialisation}
+\label{sec:var-initalisation}
 
 
 \subsection{Loan Constraint Propagation}
