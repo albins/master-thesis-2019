@@ -225,34 +225,50 @@ Datalog, and other types of logic programming has been previously employed for
 program analysis, in particular pointer analyses such as may-point-to and
 must-point-to analysis, both similar to what is described in this report in that
 they require fix-point solving and graph traversal, often with a context
-sensitive analysis
-\cite{Dawson:1996:PPA:231379.231399,Berndl:2003:PAU:780822.781144,hajiyev_codequest:_2005,Whaley:2004:CCP:996893.996859,lam_context-sensitive_2005,Benton:2007:ISD:1273920.1273923,Hardekopf:2007:AGF:1250734.1250767,Smaragdakis:2011:PYC:1926385.1926390,smaragdakis_using_2010,balatsouras_datalog_2017,
-  Madsen:2016:DFD:2908080.2908096}. These systems employ a wide variety of
-solver technologies and storage back-ends for fact handling, from Binary
+sensitive analysis (i.e. respecting function boundaries) like the
+one described here\cite{Dawson:1996:PPA:231379.231399,
+  Berndl:2003:PAU:780822.781144, hajiyev_codequest:_2005,
+  Whaley:2004:CCP:996893.996859, lam_context-sensitive_2005,
+  Benton:2007:ISD:1273920.1273923, Hardekopf:2007:AGF:1250734.1250767,
+  Smaragdakis:2011:PYC:1926385.1926390, smaragdakis_using_2010,
+  balatsouras_datalog_2017, Madsen:2016:DFD:2908080.2908096,
+  Eichberg:2008:DCC:1368088.1368142}. These systems employ a wide variety of
+solver technologies and storage back-ends for fact storage, from Binary
 Decision Diagrams (BDDs) to explicit tuple storage, as used in this study. Some
-of them, like Flix, also extends Datalog specifically for static program
-analysis\cite{Madsen:2016:DFD:2908080.2908096}.
+of them, like \textsc{Flix}, also extends Datalog specifically for static
+program analysis\cite{Madsen:2016:DFD:2908080.2908096}.
+
+In addition to being context-sensitive, Rust's borrow checker is also
+flow-sensitive (i.e. performs analysis for each program point), like the system
+described by \citeauthor{Hardekopf:2009:SFP:1480881.1480911}, and whose form is
+very similar to the analysis performed in practice by
+Polonius~\cite{Hardekopf:2009:SFP:1480881.1480911}.
 
 A \citeyear{scholz_fast_2016}~study uses the Souffl{\'e} system, which
 synthesizes performant C++ code from the Datalog specifications, similar to how
 Datafrog embeds a minimal solver as a Rust library, to show promising
 performance for analysis of large programs~\cite{scholz_fast_2016}. The
 \textsc{Doop} system, developed by \citeauthor{smaragdakis_using_2010}, also
-shows that explicit tuple storage sometimes vastly outperforms
-BDDs~\cite{smaragdakis_using_2010}.
+shows that explicit tuple storage sometimes vastly outperforms BDDs in terms of
+execution time~\cite{smaragdakis_using_2010}, as do sparse
+bitmaps~\cite{Hardekopf:2007:AGF:1250734.1250767}.
 
 Formally, the semantics of Rust's lifetime rules has been captured in the
 language Oxide, described by
-\citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}
+\citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}. This report will
+therefore not concern itself with the semantics of the borrow rules, except
+where necessary to explain the rules.
 
 % UPDATE: make sure that this section is up to date:
 The contributions made within the scope of the thesis project specifically
 includes the implementation of liveness and initialisation calculations
 (Sections~\ref{sec:var-livenes} and~\ref{sec:var-initalisation} respectively),
-as well as work on region inference for higher-ranked types, as well as the
-evaluation and analysis of the system. The core algorithms of the Polonius for
-the region constraints were already written.
-
+as well as work on region inference for higher-ranked types. Finally, the report
+also evaluates the runtime performance of the system and suggests some potential
+optimisations in Section~\ref{sec:optim-borr-check}, and performs a field study
+of the shape of input data in Section~\ref{sec:field-study-borrow}. The core
+rules of Polonius for the region constraints were already written when the
+project started, but are described in Section~\ref{sec:fixme} for completeness.
 
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
 Most of these examples are borrowed from
@@ -328,20 +344,21 @@ The logic of the borrow check as described in
 Section~\ref{sec:reference-provenance} is calculated at the level of an
 intermediate representation of Rust called the Mid-Level Intermediate
 Representation (MIR), corresponding to the basic blocks of program control flow.
-The input data to the Polonius solver (called ``facts'') is generated in the
-Rust compiler by analysing this intermediate representation. This means that we
-can safely assume to be working with simple variable-value assignment
-expressions, of the type \InRust{_1 = _2}.
+The input data to the Polonius solver is generated in the Rust compiler by
+analysing this intermediate representation. This means that we can safely assume
+to be working with simple variable-value assignment expressions, of the type
+\InRust{_1 = _2}.
 
-\fixme{Rust uses \emph{supporting prefixes} to refer to the parts of a variable
-  access path touched by a dereferencing in the MIR~\cite{noauthor_rfc_2019}.
-  This becomes important when determining which parts of a reference to consider
-  under borrowing constraints. For example, given a tuple with a reference
-  \InRust{r: (&(i32, i64), (f32, f64))}, the path \InRust{(*r.0).1} has type
-  \InRust{i64} and the supporting prefixes \InRust{(*r.0).1} and \InRust{*r.0}
-  (\InRust{*} has a low precedence and so it \InRust{*r.0} is the same as
-  \InRust{*(r.0)}). Similarly, the path \InRust{r.1.0} has the supporting
-  prefixes \InRust{r.1.0}, \InRust{r.1}, and \InRust{r}}.
+% Removed because we never actually calculate these in the report
+% \fixme{Rust uses \emph{supporting prefixes} to refer to the parts of a variable
+%   access path touched by a dereferencing in the MIR~\cite{noauthor_rfc_2019}.
+%   This becomes important when determining which parts of a reference to consider
+%   under borrowing constraints. For example, given a tuple with a reference
+%   \InRust{r: (&(i32, i64), (f32, f64))}, the path \InRust{(*r.0).1} has type
+%   \InRust{i64} and the supporting prefixes \InRust{(*r.0).1} and \InRust{*r.0}
+%   (\InRust{*} has a low precedence and so it \InRust{*r.0} is the same as
+%   \InRust{*(r.0)}). Similarly, the path \InRust{r.1.0} has the supporting
+%   prefixes \InRust{r.1.0}, \InRust{r.1}, and \InRust{r}}.
 
 \section{From Lifetimes to Reference Provenance}
 \label{sec:reference-provenance}
@@ -351,7 +368,7 @@ like any other type using the syntax \InRust{&'lifetime}. In the literature, the
 terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
 lifetime''~\nocite{noauthor_rfc_2019}, and ``reference
 provenance''~\cite{weiss_oxide:_2019} (RefProv) are all employed. As the section
-heading suggests, I will use the last one of them, as I believe it best captures
+heading suggests, I will use the last one of them as I believe it best captures
 the concept.
 
 From a type system perspective, the RefProv is part of the type of
@@ -382,7 +399,7 @@ formally the type of the right-hand side, \InRust{&'a i32}, must be a subtype of
 the left-hand side's type; \InRust{&'a i32 <: &'b i32}. In practice, this
 establishes that \InRust{'b} lives at most as long as \InRust{'a}, which means
 that the subtyping rules for regions establishes a set membership constraint
-between the regions, as seen in Formula~\ref{eq:subtype}.
+between the regions, as seen in Rule~\ref{eq:subtype}.
 
 \begin{equation}\label{eq:subtype}
 \ntyperule{a \subseteq b}{\InRust{&'a u32} <: \InRust{&'b u32}}
@@ -459,7 +476,70 @@ fn main() {
 \section{Datalog and Datafrog}
 \label{sec:datalog}
 
-\fixme{Describe datalog's syntax and execution model.}
+This thesis uses the notation of Souffl{\'e}~\cite{scholz_fast_2016}. Datalog is
+a derivative of the logic programming language Prolog, with \fixme{x guarantees
+  about execution}. It describes fixpoint calculations over logical relations as
+predicates, described as fixed input \emph{facts}, computed \emph{relations}, or
+\emph{rules} describing how to populate the relations based on facts or other
+relations. For example, defining a fact describing that an individual is another
+individual's parent might look like \InDatalog{parent(mary, john).}, while
+computing the \InDatalog{ancestor} relation could use the two rules
+\InDatalog{ancestor(X, Y) :- parent(X, Y).} and \InDatalog{ancestor(X, Y) :-
+  parent(X, Z), ancestor(Z, Y).}, reflecting the fact that ancestry is
+respectively either parenthood or transitive parenthood (example from the
+Wikipedia article on Datalog~\cite{wiki:datalog}).
+
+
+Datafrog~\cite{datafrog} is a minimalist Datalog implementation embedded in
+Rust, providing an implementation of a worst-case optimal join algorithm as
+described in~\cite{ngo_worst-case_2012}. The fact that Datafrog is embedded in
+Rust means that standard Rust language abstractions are used to describe the
+computation. Static facts are described as \InRust{Relation}s, while
+\InRust{Variable}s are used to capture the results of computations, both of
+which are essentially sets of tuples. Rules are described using a join with
+either a \InRust{Variable} or an \InRust{Relation}, with an optimised join
+method for joins with the variable itself. Only single-step joins on the first
+tuple element are possible, which means that more complex rules must be written
+with intermediary variables, and manual indices created whenever a relation must
+be joined on a variable which is not the first in the tuple.
+
+\begin{sourcecode}
+  \captionof{listing}{The implementation of \InDatalog{var_live(V, P)} in
+    Datafrog.}\label{lst:datafrog:var-live}
+\begin{minted}{rust}
+var_live_var.from_leapjoin(
+    &var_live_var,
+    (
+        var_defined_rel.extend_anti(|&(v, _q)| v),
+        cfg_edge_reverse_rel.extend_with(|&(_v, q)| q),
+    ),
+    |&(v, _q), &p| (v, p),
+);
+\end{minted}
+\end{sourcecode}
+
+
+As an example, the Datafrog code for \InDatalog{var_live(V, P)} of
+Listing~\ref{lst:var-live} becomes the code in
+Listing~\ref{lst:datafrog:var-live}, and the corresponding join used for the
+first half of \InDatalog{region_live_at(R, P)} of
+Listing~\ref{lst:region-live-at} can be seen in
+Listing~\ref{lst:datafrog:region-live-at}.
+
+\begin{sourcecode}
+  \captionof{listing}{The first half of the implementation of
+    \InDatalog{region_live_at(R, P)} in
+    Datafrog.}\label{lst:datafrog:region-live-at}
+\begin{minted}{rust}
+region_live_at_var.from_join(
+    &var_drop_live_var, 
+    &var_drops_region_rel, 
+    |_v, &p, &r| {
+        ((r, p), ())
+    });
+\end{minted}
+\end{sourcecode}
+
 
 \chapter{A Datalog Model for the Rust Borrow Checker}
 \label{cha:investigation}
@@ -477,17 +557,18 @@ fn main() {
   borrow $B$ starting at the point $P$ (this is usually the point \emph{after}
   the right-hand-side of a borrow expression).
   
-\item[\InDatalog{universal_region(R)}] this is a "free region" within fn body
-  \fixme{what the heck is a free region}
+\item[\InDatalog{universal_region(R)}] for each named region$R$ supplied to the
+  function. $R$ is considered live in every point.
   
 \item[\InDatalog{cfg_edge(P,Q)}] whenever there is a relation $P \rightarrow Q$
   in the control flow graph.
     
 \item[\InDatalog{killed(B,P)}] when some prefix of the path borrowed at $B$ is
-  assigned at point $P$.
+  assigned at point~$P$.
     
-\item[\InDatalog{outlives(R1, R2, P)}] when we require `R1@P: R2@P`
-  \fixme{better description, use set membership notation}
+\item[\InDatalog{outlives(R1, R2, P)}] when $R_1 \subseteq R_2$ must hold at
+  point~$P$, a consequence of subtyping relationships as described in
+  Rule~\eqref{eq:subtype}.
     
 \item[\InDatalog{invalidates(P, L)}] when the loan $L$ is invalidated at point $P$.
     
@@ -529,7 +610,8 @@ var_live(V, P) :-
 
 
 There is also a very similar relation for drop-liveness with an identical shape
-and different input relations corresponding to drop-uses.
+and different input relations corresponding to drop-uses. An example of the
+output from this calculation can be seen in Figure~\ref{fig:liveness-graph}.
 
 Both of these are then used to calculate the reference liveness relation
 (Listing~\ref{lst:region-live-at}), which serves as input for the rest of the
@@ -552,6 +634,17 @@ region_live_at(R, P) :-
 \end{minted}
 \end{sourcecode}
 
+\begin{figure}
+  \includegraphics[width=0.9\linewidth]{Graphs/liveness.pdf}
+  \caption{A graph representation of the the variable liveness calculation
+    results, with relevant Polonius facts as they occur (a droplet symbolising
+    \InDatalog{var_drop_used}, a wrench \InDatalog{var_used}, and a skull and
+    crossbones symbolising \InDatalog{var_defined}). Variables are named by
+    prefixing underscores, and edges annotated with the propagated live variable
+    and its liveness type(s) (\textbf{D}rop or \textbf{U}se).}
+  \label{fig:liveness-graph}
+\end{figure}
+
 \subsection{Variable Initialisation}
 \label{sec:var-initalisation}
 
@@ -562,13 +655,13 @@ region_live_at(R, P) :-
 
 \subsection{Illegal Subset Relations}
 
-\section{A Field Study of Borrow Patterns}
+\section{A Field Study of Borrow Patterns}\label{sec:field-study-borrow}
 
-\section{Optimising the Borrow Checker}
+\section{Optimising the Borrow Checker}\label{sec:optim-borr-check}
 
 % implied constraints, symmetries, optimisations
 
-\chapter{Conclusions and Future Work}
+\chapter{Conclusions and Future Work}\label{cha:conclusions}
 %\epigraph{\fixme{short quote}}
 
 %\begin{appendices}
