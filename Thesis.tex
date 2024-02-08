@@ -140,6 +140,12 @@
 {\IfNoValueTF{#2}{#1} {#1\,\delimsize|\,\mathopen{}#2}}%{#1\:;\:#2}
 
 \newcommand{\ntyperule}[2]{\begin{array}{c}#1\\\hline\raisebox{1pt}{\strut}#2\end{array}}
+\newcommand{\Loan}[0]{l}
+
+% Relations
+\DeclareMathOperator{\Live}{Live}
+\DeclareMathOperator{\Invalidated}{Invalidated}
+\DeclareMathOperator{\MayBeInitialised}{MayBeInitialised} 
 
 \title{Modelling Rust's Reference Ownership Analysis Declaratively in Datalog}
 
@@ -273,8 +279,9 @@ also evaluates the runtime performance of the system and suggests some potential
 optimisations in Section~\ref{sec:optim-borr-check}, and performs a field study
 of the shape of input data in Section~\ref{sec:field-study-borrow}. The core
 rules of Polonius for the region constraints were already written when the
-project started, but are described in Section~\ref{sec:fixme} for completeness.
-For clarity, sections not developed by me are marked with daggers~(\notmine{}).
+project started, but are described in Section~\ref{sec:loan-constr-prop} for
+completeness. For clarity, sections detailing components not developed by me are
+marked with~(\notmine{}).
 
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
 Most of these examples are borrowed from
@@ -468,25 +475,42 @@ come into relation with each other through type unification.
 \ntyperule{a \subseteq b}{\InRust{&'a u32} <: \InRust{&'b u32}}
 \end{equation}
 
-
 Under these rules, a Rust function is valid from the perspective of the borrow
 check if, for each point in the control flow graph, the borrow rules are
-respected. That means, for each point $p$, with environment $\Gamma_p$:
-
-\begin{itemize}
-\item moving or unique-borrowing a place $\pi$ implies that for all every loan
-  $l$ of $\pi$ in $\Gamma_p l \:\text{Killed}\: p$.
-\item shared-borrowing a place $\pi$ creates a new loan $l$ which is in the
-  provenance variable of the LHS. \fixme{How do I show that this invalidates any
-  shared borrows of $\pi$???}.
-\item assigning to a place $\pi$:
-  \begin{itemize}
-  \item kills the loan associated with $\pi$ from $p$ and onward
-  \item enforces a subset relationship between LHS' region and RHS' region
-    \fixme{how does this interact with overwriting?!}
-  \end{itemize}
-\end{itemize}
-
+respected. In logic terms, this means that we cannot find a point $p$ in the
+control-flow graph such that a loan $\Loan$ is live there while its conditions
+are being validated, or more formally $\lnot \exists(\Loan, p) \: : \:
+\Live(\Loan, p) \land \Invalidated(\Loan, p))$. These relations are then defined
+as follows:
+\begin{description}
+\item[the $\Live(\Loan, p)$ relation for a loan~$\Loan$] A loan is live at a given
+  position $p$ if there exists a live provenance variable $R$ such that $\Loan
+  \in R$, or formally: $\exists(\Loan, R, p, \Gamma_p) \: : \: \Live(R, p) \land
+  \Loan \in \Gamma_p(R)$, where I by~$\Gamma_p$ mean the environment at $p$,
+  and~$\Gamma_p(R)$ mean the loans in~$R$ at point~$p$. \fixme{This is not how
+    Weiss uses gamma!}
+\item[the $\Live(R, p)$ relation for a provenance variable~$R$] A provenance
+  variable is live at~$p$ if and only if a variable whose type it is part of is
+  live there. \fixme{type-system describe ``there exists a variable $v$ with
+    type $\tau$ such that $R$ is $\tau$'s provenance variable and $\Live(v,
+    p)$''}
+\item[the $\Live(v, p)$ relation for a variable~$v$] A variable is live at $p$
+  if there exists a point~$q$ reachable from~$p$ where $v$ is accessed either
+  directly or by a \InRust{drop()} (see Section~\ref{sec:deall-as-spec} for a
+  discussion of when a variable is considered to be used in a deallocation),
+  without having been overwritten (``killed'') somewhere between $q$ and $p$.
+  Notably, a variable is only used by a Drop if it might be partially
+  initialised when the drop happens. \fixme{Formalise this.}
+\item[the $\MayBeInitialised(v, q)$ relation for a variable~$v$] A variable may
+  be (partially) initialised if there is a path through the CFG from a point
+  $p$, where some part $\pi$ of $v$ is initialised, to $q$ without $\pi$ getting
+  deallocated along that path. \fixme{Formalise this.}
+\item[$\Loan \in R$ for loan $\Loan$] A loan is a member of $R$ if and only if is
+  was originally part of the loan that created $R$, or if $\exists R' \: :
+  \:\Loan \in R' \land R' \subseteq R$. \fixme{Describe relationship to gamma!}
+  \fixme{How to point-qualify these relationships?}
+  \item[$R' \subseteq R$ for provenance variables $R, R'$] \fixme{write this}
+\end{description}
 
 \section{Deallocation As a Special Case of Variable Use}
 \label{sec:deall-as-spec}
@@ -669,8 +693,8 @@ The following short-hand names are used:
   variable~$R$ supplied to the function. $R$ is considered universally
   quantified, and therefore live in every point of the function.
   
-\item[\InDatalog{cfg_edge(P, Q)}] whenever there is a relation $P \rightarrow Q$
-  in the control flow graph.
+\item[\InDatalog{cfg_edge(P, Q)}] whenever there is a transition~$P \rightarrow
+  Q$ in the control flow graph.
     
 \item[\InDatalog{killed(L, P)}] when some prefix of the path (\fixme{explain
     prefixes and paths}) borrowed in $L$ is assigned at point~$P$.
@@ -698,6 +722,11 @@ The following short-hand names are used:
   all of~$V$'s data, as discussed in Section~\ref{sec:deall-as-spec}.
 \end{description}
 
+\subsection{Variable Initialisation}
+\label{sec:var-initalisation}
+
+\subsubsection{Reporting Initialisation Errors}
+\label{sec:initialisation:errors}
 
 \subsection{Reference Liveness}
 \label{sec:var-livenes}
@@ -718,6 +747,7 @@ var_live(V, P) :-
 \end{minted}
 \end{sourcecode}
 
+\fixme{describe drop-liveness}
 
 There is also a very similar relation for drop-liveness with an identical shape
 and different input relations corresponding to drop-uses. An example of the
@@ -755,11 +785,7 @@ region_live_at(R, P) :-
   \label{fig:liveness-graph}
 \end{figure}
 
-\subsection{Variable Initialisation}
-\label{sec:var-initalisation}
-
-
-\subsection{Loan Constraint Propagation\notmine{}}
+\subsection{Loan Constraint Propagation\notmine{}}\label{sec:loan-constr-prop}
 
 The first relation used in Polonius is the \InDatalog{subset(R1, R2, P)}
 relation, which states that~$R_1 \subseteq R_2$ for two provenance
@@ -863,7 +889,7 @@ requires(R, L, Q) :-
 \end{sourcecode}
 
 
-\subsection{Detecting Loan Violations\notmine{}}
+\subsubsection{Detecting Loan Violations}
 
 The compiler produces a set of points in the CFG where a loan could possibly be
 violated (e.g. by producing a reference to a value that already has a unique
@@ -892,7 +918,7 @@ error(P) :-
 \end{minted}
 \end{sourcecode}
 
-\subsection{Illegal Subset Relations}
+\subsection{Illegal Subset Relations}\label{sec:illeg-subs-relat}
 
 \fixme{this isn't implemented yet!!!}
 
@@ -901,7 +927,7 @@ error(P) :-
 \fixme{say something about how and when the facts are generated in the Rust
   compiler.}
 
-\section{A Field Study of Polonius Input Data}\label{sec:field-study-borrow}
+\section{A Field Study of Polonius Starting Facts}\label{sec:field-study-borrow}
 
 I selected roughly 20 000~publicly available Rust packages (``crates'') from the
 most popular projects, as defined by number of downloads from Crates.io and
@@ -911,7 +937,7 @@ number of stars on GitHub, for analysis.~\footnote{Source code for the analysis
 selected repositories only about 1 000 were from other sources than GitHub. Only
 crates that compiled under recent versions of Rust nightly builds with
 non-linear lifetimes enabled were kept. The source code of the packages was then
-translated to Polonius input files for a total of 283GBs~of tab-separated
+translated to Polonius input files for a total of 400GBs~of tab-separated
 tuples, which I used to measure Polonius solve-time performance as well as for
 finding common patterns in the input data. Only complete data sets were
 considered; a repository with more than one target where at least one target did
