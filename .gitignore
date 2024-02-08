@@ -10,7 +10,7 @@
 *.lot
 *.run.xml
 *.toc
-/.DS_Store
 /auto
 /bibliography.log
 /_minted-*
+.DS_Store

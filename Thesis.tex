@@ -100,6 +100,7 @@
 %\usepackage{cleveref}
 \usepackage[toc,page]{appendix}
 \newcommand{\fixme}[1] {{\color{red}#1}}
+\newcommand{\notmine}[0] {$^\dagger$}
 \usepackage{microtype}
 \usepackage[newfloat]{minted}
 \usepackage{caption}
@@ -360,22 +361,23 @@ to be working with simple variable-value assignment expressions, of the type
 %   \InRust{*(r.0)}). Similarly, the path \InRust{r.1.0} has the supporting
 %   prefixes \InRust{r.1.0}, \InRust{r.1}, and \InRust{r}}.
 
-\section{From Lifetimes to Reference Provenance}
+\section{From Lifetimes to Provenance Variables}
 \label{sec:reference-provenance}
 
-As lifetimes are a part of a variable's types, they can be referred to by name
-like any other type using the syntax \InRust{&'lifetime}. In the literature, the
-terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
+As the lifetime of its value is a part of a variable's type, it can be referred
+to by name like any other type using the syntax \InRust{&'lifetime}. In the
+literature, the terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
 lifetime''~\nocite{noauthor_rfc_2019}, and ``reference
-provenance''~\cite{weiss_oxide:_2019} (RefProv) are all employed. As the section
-heading suggests, I will use the last one of them as I believe it best captures
-the concept.
+provenance''~\cite{weiss_oxide:_2019} (provenance) are all employed. As the
+section heading suggests, I will use the last one of them as I believe it best
+captures the concept. Named provenances (such as \InRust{'lifetime} above) are
+referred to as ``provenance variables''.
 
-From a type system perspective, the RefProv is part of the type of
-any reference and corresponds to the borrow expressions that might have
-generated it. For example, if a reference \InRust{r} has the type \InRust{&'a
-  Point}, \InRust{r} is only valid as long as the terms of the loans in
-\InRust{'a} are upheld. Take for example the code of
+From a type system perspective, the provenance is part of the type of any
+reference and corresponds to the borrow expressions that might have generated it
+in the Polonius formulation of the borrow check. For example, if a reference
+\InRust{r} has the type \InRust{&'a Point}, \InRust{r} is only valid as long as
+the terms of the loans in \InRust{'a} are upheld. Take for example the code of
 Listing~\ref{lst:multi-path-borrow}, where \InRust{p} would have the type
 \InRust{&'a i32} where \InRust{a} is the set $\Set{L_0, L_1}$.
 
@@ -407,12 +409,13 @@ between the regions, as seen in Rule~\ref{eq:subtype}.
 
 \fixme{How to incorporate the fact that this is with respect to the current point?}
 
-Finally, when talking about the \emph{liveness} of a RefProv $r$, we will mean
-that $r$ occurs (\fixme{what does occurs mean? Does it encompass exploded
-  subset-types etc?}) in the type of a variable that is live at some point in
-the control-flow graph $p$, with the meaning that any of the loans in $r$ might
-be dereferenced at control-flow points reachable from $p$, and thus that the
-terms of the loans in $r$ must be respected at that point.
+Finally, when talking about the \emph{liveness} of a provenance variable $r$, we
+will mean that $r$ occurs (\fixme{what does occurs mean? Does it encompass
+  exploded subset-types etc?}) in the type of at least one live variable at some
+point in the control-flow graph $p$. This has the semantic implication that any
+of the loans in $r$ might be dereferenced at control-flow points reachable from
+$p$, and thus that the terms of the loans in $r$ must be respected at that
+point.
 
 
 \section{Deallocation As a Special Case of Variable Use}
@@ -476,18 +479,18 @@ fn main() {
 \section{Datalog and Datafrog}
 \label{sec:datalog}
 
-This thesis uses the notation of Souffl{\'e}~\cite{scholz_fast_2016}. Datalog is
-a derivative of the logic programming language Prolog, with \fixme{x guarantees
-  about execution}. It describes fixpoint calculations over logical relations as
-predicates, described as fixed input \emph{facts}, computed \emph{relations}, or
-\emph{rules} describing how to populate the relations based on facts or other
-relations. For example, defining a fact describing that an individual is another
-individual's parent might look like \InDatalog{parent(mary, john).}, while
-computing the \InDatalog{ancestor} relation could use the two rules
-\InDatalog{ancestor(X, Y) :- parent(X, Y).} and \InDatalog{ancestor(X, Y) :-
-  parent(X, Z), ancestor(Z, Y).}, reflecting the fact that ancestry is
-respectively either parenthood or transitive parenthood (example from the
-Wikipedia article on Datalog~\cite{wiki:datalog}).
+Datalog is a derivative of the logic programming language Prolog, with \fixme{x
+  guarantees about execution}. It describes fixpoint calculations over logical
+relations as predicates, described as fixed input \emph{facts}, computed
+\emph{relations}, or \emph{rules} describing how to populate the relations based
+on facts or other relations. For example, defining a fact describing that an
+individual is another individual's parent might look like
+\InDatalog{parent(mary, john).}, while computing the \InDatalog{ancestor}
+relation could use the two rules \InDatalog{ancestor(X, Y) :- parent(X, Y).} and
+\InDatalog{ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).}, reflecting the fact
+that ancestry is respectively either parenthood or transitive parenthood
+(example from the Wikipedia article on Datalog~\cite{wiki:datalog}). This thesis
+uses the notation of Souffl{\'e}~\cite{scholz_fast_2016}.
 
 
 Datafrog~\cite{datafrog} is a minimalist Datalog implementation embedded in
@@ -550,42 +553,53 @@ region_live_at_var.from_join(
 
 \subsection{Starting Facts}
 \label{sec:input-facts}
-\fixme{Verify the terminology for this in Datalog parlance!}
+
+The following short-hand names are used:
+\begin{description}
+\item[$R$] is a provenance.
+\item[$L$] is a loan, that is an \InRust{&v} expression creating a reference
+  to \InRust{v}.
+\item[$P, Q$] are points in the control-flow graph of the function under analysis.
+\item[$V$] is a variable.
+\end{description}
+
 
 \begin{description}
-\item[\InDatalog{borrow_region(R, B, P)}] the region $R$ may refer to data from
-  borrow $B$ starting at the point $P$ (this is usually the point \emph{after}
-  the right-hand-side of a borrow expression).
+\item[\InDatalog{borrow_region(R, L, P)}] the provenance~$R$ may refer
+  to data from loan $L$ starting at the point $P$ (this is usually the point
+  \emph{after} the right-hand-side of a borrow expression).
   
-\item[\InDatalog{universal_region(R)}] for each named region$R$ supplied to the
-  function. $R$ is considered live in every point.
+\item[\InDatalog{universal_region(R)}] for each named/parametrised provenance
+  variable~$R$ supplied to the function. $R$ is considered universally
+  quantified, and therefore live in every point of the function.
   
-\item[\InDatalog{cfg_edge(P,Q)}] whenever there is a relation $P \rightarrow Q$
+\item[\InDatalog{cfg_edge(P, Q)}] whenever there is a relation $P \rightarrow Q$
   in the control flow graph.
     
-\item[\InDatalog{killed(B,P)}] when some prefix of the path borrowed at $B$ is
-  assigned at point~$P$.
+\item[\InDatalog{killed(L ,P)}] when some prefix of the path (\fixme{explain
+    prefixes and paths}) borrowed in $L$ is assigned at point~$P$.
     
 \item[\InDatalog{outlives(R1, R2, P)}] when $R_1 \subseteq R_2$ must hold at
   point~$P$, a consequence of subtyping relationships as described in
   Rule~\eqref{eq:subtype}.
     
-\item[\InDatalog{invalidates(P, L)}] when the loan $L$ is invalidated at point $P$.
+\item[\InDatalog{invalidates(P, L)}] when the loan~$L$ is invalidated by some
+  operation at point~$P$.
     
-\item[\InDatalog{var_used(V, P)}] when the variable $V$ is used for anything but
-  a drop at point $P$.
+\item[\InDatalog{var_used(V, P)}] when the variable~$V$ is used for anything but
+  a drop at point~$P$.
     
-\item[\InDatalog{var_defined(V, P)}] when the variable $V$ is assigned to
-  (killed) at point $P$.
+\item[\InDatalog{var_defined(V, P)}] when the variable~$V$ is assigned to
+  (killed) at point~$P$.
   
-\item[\InDatalog{var_drop_used(V, P)}] when the variable $V$ is used in a drop at point $P$.
+\item[\InDatalog{var_drop_used(V, P)}] when the variable~$V$ is used in a drop at point~$P$.
 
-\item[\InDatalog{var_uses_region(V, R)}] when the type of $V$ includes the RefProv
-  $R$.
+\item[\InDatalog{var_uses_region(V, R)}] when the type of~$V$ includes the
+  provenance~$R$.
 
-\item[\InDatalog{var_drops_region(V, R)}] when the type of $V$ includes the
-  RefProf $R$, and $V$ also implements a custom drop method which might need all
-  of $V$'s data, as discussed in Section~\ref{sec:deall-as-spec}.
+\item[\InDatalog{var_drops_region(V, R)}] when the type of~$V$ includes the
+  provenance~$R$, and~$V$ also implements a custom drop method which might need
+  all of~$V$'s data, as discussed in Section~\ref{sec:deall-as-spec}.
 \end{description}
 
 
@@ -593,8 +607,8 @@ region_live_at_var.from_join(
 \label{sec:var-livenes}
 
 The basic liveness of a variable (Listing~\ref{lst:var-live}) is defined as
-follows: if a variable $v$ is live in some point $q$ and $q$ is reachable from
-$p$ in the control-flow graph, then $v$ is live in $p$ too unless it was
+follows: if a variable~$v$ is live in some point~$q$ and~$q$ is reachable from
+$p$ in the control-flow graph, then~$v$ is live in~$p$ too unless it was
 overwritten; in essence liveness is propagated backwards through the CFG.
 
 \begin{sourcecode}
@@ -615,13 +629,13 @@ output from this calculation can be seen in Figure~\ref{fig:liveness-graph}.
 
 Both of these are then used to calculate the reference liveness relation
 (Listing~\ref{lst:region-live-at}), which serves as input for the rest of the
-borrow checker. A given RefProv $r$ is live at some point $p$ if it is in the
-type of a variable $v$ which is either drop-live or use-live at $p$, with some
+borrow checker. A given provenance~$r$ is live at some point~$p$ if it is in the
+type of a variable~$v$ which is either drop-live or use-live at~$p$, with some
 notable caveats for drop-liveness (discussed in Section~\ref{sec:deall-as-spec})
 embedded in the \InDatalog{var_drops_region} relation.
 
 \begin{sourcecode}
-  \captionof{listing}{The Datalog rules RefProv
+  \captionof{listing}{The Datalog rules for provenance
     liveness.}\label{lst:region-live-at}
 \begin{minted}{prolog}
 region_live_at(R, P) :-
@@ -649,11 +663,11 @@ region_live_at(R, P) :-
 \label{sec:var-initalisation}
 
 
-\subsection{Loan Constraint Propagation}
+\subsection{Loan Constraint Propagation\notmine{}}
 
-\subsection{Loan Violations}
+\subsection{Loan Violations\notmine{}}
 
-\subsection{Illegal Subset Relations}
+\subsection{Illegal Subset Relations\notmine{}}
 
 \section{A Field Study of Borrow Patterns}\label{sec:field-study-borrow}
 
