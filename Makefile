@@ -29,4 +29,5 @@ diff:
     --verbose \
 	HEAD^
 
-
+%.pdf: %.dot
+	dot -Tpdf -o $@ $<

@@ -388,10 +388,22 @@ to be working with simple variable-value assignment expressions, of the type
 \InRust{_1 = _2}, as opposed to complex expressions involving multiple variables
 on the right-hand side.
 
+\begin{figure}
+  \includegraphics[width=0.65\linewidth]{Graphs/mir-example}
+  \caption{A graph rendering of the \InRust{main()} function from the small Rust
+  program in Listing~\ref{lst:mir-example-input}, illustrating branching (block 0) and
+  return from a function call (5). It is worth noting the Unwind arm of the
+  function, which would be called if the function call would have failed
+  (panicked).}
+  \label{fig:mir-example}
+\end{figure}
+
 The MIR consists of basic blocks in the traditional compilers sense, each
 containing a set of statements and usually ending with a \emph{terminator}, an
 expression providing a branching to other basic
-blocks~\cite{mir_rfc,rustc_developers_guide_nodate}.
+blocks~\cite{mir_rfc,rustc_developers_guide_nodate}. A rendering of the MIR of
+the program in Listing~\ref{lst:mir-example-input} can be seen in
+Figure~\ref{fig:mir-example}.
 
 % Removed because we never actually calculate these in the report
 % \fixme{Rust uses \emph{supporting prefixes} to refer to the parts of a variable
@@ -403,6 +415,25 @@ blocks~\cite{mir_rfc,rustc_developers_guide_nodate}.
 %   (\InRust{*} has a low precedence and so it \InRust{*r.0} is the same as
 %   \InRust{*(r.0)}). Similarly, the path \InRust{r.1.0} has the supporting
 %   prefixes \InRust{r.1.0}, \InRust{r.1}, and \InRust{r}}.
+
+
+\begin{sourcecode}
+  \captionof{listing}{A small (and meaningless) Rust program to illustrate
+    MIR~output, featuring branching and a function
+    application.}\label{lst:mir-example-input}
+\begin{minted}{rust}
+fn main() {
+    let x = 17;
+    let z = if x == 3 {
+        92
+    } else {
+        x
+    };
+
+    do_something(z);
+}
+\end{minted}
+\end{sourcecode}
 
 \section{From Lifetimes to Provenance Variables}
 \label{sec:reference-provenance}
