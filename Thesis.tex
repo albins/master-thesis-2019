@@ -671,11 +671,14 @@ this sense, mutable memory is affine in Rust (used at most once); this is
 precisely the concept that guarantees freedom from data races and many other
 memory bugs. In comparison with other recent languages using capability types
 like Pony~\cite{clebsch2015pony, Clebsch:2015:DCS:2824815.2824816} or
-Encore~\cite{castegren2018capability}, Rust's memory ownership is relatively
+Encore~\cite{Brandauer2015}, Rust's memory ownership is relatively
 unsophisticated. Specifically, while capabilities attach to reference types of a
 language much like the borrow check's lending information (more closely
 discussed in the following section), capabilities have a higher resolution on
-operations they can allow or deny.
+operations they can allow or deny. For a more extensive discussion of more
+advanced, capabilities-based type type systems, including a comparison to Rust,
+see \citeauthor*{castegren2018capability}'s 2018
+dissertation~\cite{castegren2018capability}.
 
 \section{Polonius: From Lifetimes to Provenance
   Variables}\label{sec:reference-provenance}
