@@ -70,8 +70,8 @@
 \usepackage[lining]{sourcecodepro}
 \allsectionsfont{\normalfont\sffamily\bfseries}
 
-\clubpenalty 4000
-\widowpenalty 4000
+%\clubpenalty 4000
+%\widowpenalty 4000
 
 % Document links and bookmarks
 \usepackage{url}
@@ -695,13 +695,14 @@ ways. This means that any conditions of a loan that resulted in a reference $r$
 stored in a \InRust{struct} $s$ instance $a$ must only be respected as far as
 \InRust{a.drop()} is concerned if $s$ implements a custom deallocator. Otherwise
 the loan of $r$ may be safely violated, as the default deallocator never
-dereferences $r$ and thus doesn't require $r$ to be valid. An illustration of
+dereferences $r$ and thus does not require $r$ to be valid. An illustration of
 this can be seen in Listing~\ref{lst:drop-liveness}.
 
 \begin{sourcecode}
   \captionof{listing}{The custom deallocator for \InRust{OwnDrop} enforces the
-    loan of \InRust{data}, but the loan in \InRust{OwnDrop} is effectively dead
-    and thus can be violated.}\label{lst:drop-liveness}
+    loan giving the reference \InRust{data} until the struct is deallocated, but
+    the loan in \InRust{DefaultDrop} is effectively dead as soon as it has no
+    direct uses in the code and thus can be violated.}\label{lst:drop-liveness}
 \begin{minted}{rust}
 struct OwnDrop<'a> {
     data: &'a u32,
@@ -724,7 +725,7 @@ fn main() {
     let mut y = 12;
     let b = DefaultDrop { data: &y };
     
-    // let mutrefa = &mut x;
+    let mutrefa = &mut x;
     // ERROR: the loan of x must be respected...
     
     // ...but the loan of y need not be!
@@ -736,7 +737,24 @@ fn main() {
 \end{minted}
 \end{sourcecode}
 
-\fixme{Describe how this translates to MIR!}
+\begin{figure}
+  \includegraphics[width=0.65\linewidth]{Graphs/drop-main-mir}
+  \caption{A graph rendering of the MIR produced from the \InRust{main()}
+    function of Listing~\ref{lst:drop-liveness} illustrating a call to the
+    custom deallocator of~\InRust{_2} that would cause it to be drop-live during
+    the block. Take special note of the lack of calls to \InRust{drop(_6)};
+    \InRust{_6} is both drop-dead and use-dead for the duration of the block.
+    Some irrelevant details, such as hints about stack allocations and
+    deallocations of intermediate variables, have been pruned.}
+  \label{fig:mir-drop}
+\end{figure}
+
+Following the MIR translation of Listing~\ref{lst:drop-liveness} in
+Figure~\ref{fig:mir-drop}, we see across the slightly confusing re-borrows used
+to move the created references into the \InRust{struct}s that the only block of
+the function ends with a call to \InRust{drop()} that would invoke the custom
+deallocator. Here, the deallocator for \InRust{b}, our instance of
+\InRust{DefaultDrop}, is never even called at all.
 
 \section{Datalog and Datafrog}
 \label{sec:datalog}
@@ -917,7 +935,11 @@ The following short-hand names are used:
 
 \item[\InDatalog{var_drops_region(V, R)}] when the type of~$V$ includes the
   provenance~$R$, and~$V$ also implements a custom drop method which might need
-  all of~$V$'s data, as discussed in Section~\ref{sec:deall-as-spec}.
+  all of~$V$'s data, as discussed in Section~\ref{sec:deall-as-spec}. Notably,
+  for the MIR in Listing~\ref{fig:mir-drop}, \InDatalog{var_drops_region(_2, R)}
+  would be emitted to indicate that the \InRust{struct} stored in \InRust{_2}
+  contains a reference with the provenance variable $R$ in its type, and that
+  this reference could be accessed during the deallocation at this point.
 
 \item[\InDatalog{child(M1, M2)}] when the move path $M_1$ is the child of $M_2$,
   That is, for example in the expression \InRust{x.y.z}, \InRust{x.y.z} is a
@@ -1249,20 +1271,24 @@ instance, the subtyping rules would give that \InRust{'y} $\subseteq$
 \InRust{'x} at the end of the function, because the reference into \InRust{y}
 must be a subtype of \InRust{&'x u32}, the return type. However, this cannot be
 guaranteed to hold in general, as Polonius (currently) knows nothing about the
-relationship between these two regions, and in fact, as \InRust{pick_one()} is
-polymorphic over these provenance variables, this must hold for \emph{any} pair
-of provenance variables \InRust{'x, 'y}, which it does
-not~\cite{matsakis_polonius_2019-1}.
+relationship between these two provenance variables, and in fact, as
+\InRust{pick_one()} is polymorphic over these provenance variables, this must
+hold for \emph{any} pair of provenance variables \InRust{'x, 'y}, which it
+\emph{certainly does not}~\cite{matsakis_polonius_2019-1}.
 
 \subsection{Analysis of Higher Kinds}
 \label{sec:missing-features:higher-kinds}
 
 The final missing functionality in Polonius is interaction with higher-ranked
-subtyping arising from generic functions or trait-matching. The problem was
-described in a blog entry by
+(generic, etc) subtyping arising from generic functions or trait-matching. The
+problem was described in a blog entry by
 \citeauthor{matsakis_polonius_2019}~\cite{matsakis_polonius_2019} and will
 require extensions in the Rust compiler, which would produce simpler constraints
-for Polonius to solve.
+than the universally and existentially quantified constraints generated by the
+type checker for Polonius to solve. The current plan is to use the already
+existing infrastructure in Rust for performing this type of matching between
+types, but at the time of writing work on this has not even reached the planning
+stage.
 
 \subsection{Addressing Provenance Variable Imprecision}
 \label{sec:missing-features:provenance-variable-equality}
