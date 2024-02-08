@@ -1154,7 +1154,7 @@ used in Polonius can be found in Table~\ref{tab:input-atoms}.
     Atom & Example & Description \\ \toprule
     Loan\notmine{} & \InRust{&x} & An individual borrow expression. \\
     Provenance variable\notmine{} & \InRust{'a} & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine{} & \InRust{Mid(bb1[5])} & A point in the control-flow graph. \\
+    Node\notmine{} & \InRust{Mid(bb1[5])} & A node in the control-flow graph. \\
     Move path & \InRust{x.y.z} & A precise field that can be accessed into a variable; a field in a struct or a projection in a tuple. \\
     Variable & \InRust{x} & A MIR (or Rust) variable. \\
   \end{tabular}
@@ -1304,7 +1304,7 @@ considered live when the loan on the next line generates a fact
 \InRust{error}. Precisely how these errors are derived is the subject of
 Chapter~\ref{cha:implementation}.
 
-\chapter{Datafrog, a Datalog Embedded in Rust}\label{cha:datalog}
+\chapter{Selecting an Implementation Language for Polonius}\label{cha:datalog}
 
 \epigraph{My liege, and madam, to expostulate\\
   What majesty should be, what duty is,\\
@@ -1434,7 +1434,7 @@ In the example of Listing~\ref{lst:datafrog:region-live-at}, the target
 variable~\InRust{region_live_at_var} is populated by joining the
 \InRust{Variable} \InRust{var_drop_live_var} to the \InRust{Relation}
 \InRust{var_drops_region_rel}. Here, the combination function ignores the
-variable, returning only the resulting provenance variable and CFG point. The
+variable, returning only the resulting provenance variable and CFG node. The
 final result is stored in the first half of \InRust{region_live_at} with the
 empty tuple as the second half. This is a work-around to enable joins with two
 two-tuples.
@@ -1597,17 +1597,17 @@ liveness computations can be found in Table~\ref{tab:liveness-facts-recap}.
   \begin{tabular}{@{}l l m{5.5cm}}
     Atom/Fact & Type & Description \\ \toprule
     Provenance\notmine{} & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine{} & Atom & A point in the control-flow graph. \\
+    Node\notmine{} & Atom & A node in the control-flow graph. \\
     Variable & Atom & A MIR (or Rust) variable. \\
-    \InDatalog{cfg_edge(P, Q)}\notmine{} & Fact & A transition in the CFG\@. \\
-    \InDatalog{var_used(Var, Point)} & Fact & A regular variable use happens here.\\
-    \InDatalog{var_defined(Var, Point)} & Fact & A variable is assigned here.\\
+    \InDatalog{cfg_edge(From, To)}\notmine{} & Fact & A transition in the CFG\@. \\
+    \InDatalog{var_used(Var, Node)} & Fact & A regular variable use happens here.\\
+    \InDatalog{var_defined(Var, Node)} & Fact & A variable is assigned here.\\
     \InDatalog{var_uses_region(Var, Provenance)} & Fact & Connects provenance variables from types to their variables.\\
     \InDatalog{var_drops_region(Var, Provenance)} & Fact & Deallocating this variable indirectly uses this provenance variable. \\
-    \InDatalog{var_initialized_on_entry(V, Point)} & Fact & This variable is initialised on entry to this CFG node. \\
-    \InDatalog{var_drop_live(Var, Point)} & Intermediate & This variable is used in a drop. \\
-    \InDatalog{var_use_live(Var, Point)} & Intermediate & This variable is used in an expression. \\
-    \InDatalog{region_live_at(Provenance, Point)} & Output & This provenance variable is live at this point, and the conditions of its loan must be accepted. \\
+    \InDatalog{var_initialized_on_entry(V, Node)} & Fact & This variable is initialised on entry to this CFG node. \\
+    \InDatalog{var_drop_live(Var, Node)} & Intermediate & This variable is used in a drop. \\
+    \InDatalog{var_use_live(Var, Node)} & Intermediate & This variable is used in an expression. \\
+    \InDatalog{region_live_at(Provenance, Node)} & Output & This provenance variable is live at this node, and the conditions of its loan must be accepted. \\
   \end{tabular}
 \caption[Liveness Dramatis Personae]{Liveness Dramatis Personae.}\label{tab:liveness-facts-recap}
 \end{table}%
@@ -1677,7 +1677,7 @@ var_use_live(V, P) :-
   }
 
   \caption[Rules for Calculating Use-Liveness]{The rules for calculating
-    use-liveness: a variable is use-live if it was used at a point $P$, or if it
+    use-liveness: a variable is use-live if it was used at a node $P$, or if it
     was live in $Q$, there is a transition $P\rightarrow{}Q$, and it was not
     defined (killed) in $P$.}\label{fig:var-use-live}
 \end{figure}
@@ -1845,7 +1845,7 @@ var_drop_live(V, P) :-
 
 The two kinds of liveness are then used to calculate the reference liveness
 relation (Figure~\ref{fig:region-live-at}), which serves as input for the rest
-of the borrow checker. A given provenance variable~$R$ is live at some point~$p$
+of the borrow checker. A given provenance variable~$R$ is live at some node~$p$
 if it is in the type of a use-live variable~$v$, or if it is associated to a
 drop-live variable. While the connection between use-live variables and their
 provenances is direct, the connection between a use-live variable and its
@@ -1915,21 +1915,20 @@ region_live_at(R, P) :-
   \begin{tabular}{@{}l l m{5.5cm}}
     Atom/Fact & Type & Description \\ \toprule
     Provenance\notmine{} & A & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine{} & A & A point in the control-flow graph. \\
+    Node\notmine{} & A & A node in the control-flow graph. \\
     Variable & A & A MIR (or Rust) variable. \\
     Path & A & A move path. \\
-    \InDatalog{cfg_edge(P, Q)}\notmine{} & F & A transition in the CFG\@. \\
+    \InDatalog{cfg_edge(From, To)}\notmine{} & F & A transition in the CFG\@. \\
     \InDatalog{child(Path2, Path1)} & F & \InDatalog{Path1} is a prefix of-, and not equal to \InDatalog{Path2}  \\
-    \InDatalog{initialized_at(Path, P)} & F, I & This path was given a value here. \\
-    \InDatalog{path_belongs_to_var(Path, V)} & F & This path is the root path of variable $V$. \\
-    \InDatalog{path_accessed_at(Path, Point)} & F, I & This move path is used in an expression here.\\
-    \InDatalog{moved_out_at(Path, P)} & F, I & This path was moved from this scope in an expression here. \\
+    \InDatalog{path_begins_with_var(Path, V)} & F & This path is the root path of variable $V$. \\
+    \InDatalog{path_accessed_at(Path, Node)} & F, I & This move path is used in an expression here.\\
+    \InDatalog{path_assigned_at(Path, Node)} & F, I & \InDatalog{Path} is given a value here. All non-locals (function arguments) are initialised at the start of a function.\\
+    \InDatalog{path_moved_at(Path, P)} & F, I & This path was moved from this scope in an expression here. All locals (non-arguments) are are ``moved'' at the start of the function. \\
     \InDatalog{ancestor(Above, Below)} & I & \InDatalog{Above} is a prefix of \InDatalog{Below}.\\
-    \InDatalog{path_maybe_init___exit(Path, Point)} & I & \InDatalog{Path} is initialized without subsequent deinitialisation on one or more branches reaching this CFG node (lowest upper bound on set membership).\\
-    \InDatalog{path_definitely_init___(Path, Point)} & I &  \InDatalog{Path} is initialised on all branches reaching \InDatalog{Point} (greatest lower bound on membership). \\
-    \InDatalog{path_maybe_mov___(Path, Point)} & I & \InDatalog{Path} has been moved without subsequent reinitialisation on at least one branch reaching this CFG node. \\
-    \InDatalog{var_maybe_init___(Var, Point)} & O & This variable is initialised along at least one branch reaching this node at the time of its exit. \\
-    \InDatalog{move_error(Path, Point)} & O & Error: \InDatalog{Path} is accessed here, but may have been moved, or was never initialised. \\
+    \InDatalog{path_maybe_init___exit(Path, P)} & I & \InDatalog{Path} is initialized without subsequent deinitialisation on one or more branches reaching this CFG node (lowest upper bound on set membership).\\
+    \InDatalog{path_maybe_uninit___(Path, Node)} & I & \InDatalog{Path} may be uninitialised upon exiting this~CFG node. \\
+    \InDatalog{var_maybe_init___(Var, Node)} & O & This variable is partially initialised along at least one branch reaching this node at the time of its exit. \\
+    \InDatalog{move_error(Path, Node)} & O & Error: \InDatalog{Path} is accessed here, but may not be initialised. \\
   \end{tabular}
 \caption{Move Analysis Dramatis Personae}\label{tab:move-facts-recap}
 \end{table}%
@@ -1938,19 +1937,20 @@ region_live_at(R, P) :-
 The idea behind the move analysis is again a transitive closure computation
 across the CFG, much like the one for liveness in Section~\ref{sec:liveness}.
 Initialisation (\InDatalog{path_maybe_initialized_on_exit(P, _)}) propagates
-forwards from an assignment (\InDatalog{initialized_at(P, _)}) across the CFG
-(\InDatalog{cfg_edge(P, Q)}) until the path is moved (\InDatalog{moved_out_at(P,
+forwards from an assignment (\InDatalog{path_assigned_at(P, _)}) across the CFG
+(\InDatalog{cfg_edge(P, Q)}) until the path is moved (\InDatalog{path_moved_at(P,
   _)}). We also transitively follow the move path tree downwards on each event,
 so that a use of \InRust{x} would also use \InRust{x.f}, for example. This
 transitive expansion of facts happens in a pre-computation described in
 Section~\ref{sec:move:fixpoints}, and is needed for erroneous path accesses to
 be guaranteed to overlap with a moved out path and generate an error. Finally,
 we trace root paths (and therefore also their transitive children) back to their
-variables through \InDatalog{path_belongs_to_var(P, V)} for use in drop-liveness
-computations. A summary of the inputs, outputs, and intermediary relationships
-involved in the computation can be found in Table~\ref{tab:move-facts-recap}.
-Additionally, an annotated example of Rust source code with relevant facts and
-conclusions can be found in Table~\ref{tab:move-example}.
+variables through \InDatalog{path_begins_with_var(P, V)} for use in
+drop-liveness computations. A summary of the inputs, outputs, and intermediary
+relationships involved in the computation can be found in
+Table~\ref{tab:move-facts-recap}. Additionally, an annotated example of Rust
+source code with relevant facts and conclusions can be found in
+Table~\ref{tab:move-example}.
 
 Like liveness, initialisation tracking is necessarily imprecise upon branching;
 if one branch in the CFG has \InDatalog{Path} initialised and one does not, we
@@ -1973,8 +1973,8 @@ The analysis begins with a pre-computation step that expands the path-related
 facts so that an initialisation of a prefix also initialises its children,
 grandchildren, etc. The Datalog for this can be found in
 Listings~\ref{lst:ancestor} and~\ref{lst:transitive-moves}. The transitive
-expansion happens for all the path-related facts: \InDatalog{initialized_at(P,
-  _)}, \InDatalog{accessed_at(P, _)}, \InDatalog{moved_out_at(P, _)}, and
+expansion happens for all the path-related facts: \InDatalog{path_assigned_at(P,
+  _)}, \InDatalog{accessed_at(P, _)}, \InDatalog{path_moved_at(P, _)}, and
 \InDatalog{child(P1, P2)} (which becomes \InDatalog{ancestor(P2, P1)}). The
 names are re-used in later steps to reflect the fact that we see this as a
 pre-computation step expanding compressed facts from Rust. These are, as you may
@@ -1996,13 +1996,13 @@ ancestor(Grandmother, Daughter) :-
 \begin{sourcecode}
   \captionof{listing}{Calculating transitive moves: a move, initialisation, or
     an access to a prefix transitively moves, initialises, or accesses all of
-    the prefix' children. Identical rules for for \InDatalog{initialized_at(P, _)} and
+    the prefix' children. Identical rules for for \InDatalog{path_assigned_at(P, _)} and
     \InDatalog{accessed_at(P, _)} have been omitted.}\label{lst:transitive-moves}
 \begin{minted}{prolog}
-moved_out_at(Path, P) :- moved_out_at(Path, P).
+path_moved_at(Path, P) :- path_moved_at(Path, P).
 
-moved_out_at(Child, P) :-
-     moved_out_at(Parent, P),
+path_moved_at(Child, P) :-
+     path_moved_at(Parent, P),
      ancestor(Parent, Child).
 \end{minted}
 \end{sourcecode}
@@ -2018,36 +2018,32 @@ We begin initialisation tracking on assignments. A path is trivially initialised
 in a statement where it is initialised (\InRust{x.f = 17}), and stays
 initialised in the subsequent program points unless it is moved out by a move
 expression (\InRust{move x.f}, or \InRust{move x}). The imprecision is
-introduced by the join to \InDatalog{cfg_edge(P, Q)}; it is enough for one
-connecting edge to \InDatalog{Q} to have \InRust{x.f} initialised for it to be
-initialised at \InDatalog{Q}.
+introduced by the join to \InDatalog{cfg_edge(From, To)}; it is enough for one
+connecting edge to \InDatalog{To} to have \InRust{x.f} initialised for it to be
+initialised at \InDatalog{To}.
 
 Finally, we relate the initialisation of root paths back to their variables
-through \InDatalog{path_belongs_to_var(P, V)}. This means that we only track
-variables that are moved at the root level (\InRust{move x}, as opposed to
-\InRust{move x.f}), and (for this purpose) ignore partial deinitialisation. This
-is safe to do as this information is only used to determine whether a
-deallocation of a variable would actually happen, and a deallocation is only
-guaranteed to be a no-op if the entire variable was provably
-moved.~\footnote{However, partial deallocation could still cause a move error
-  when the variable is accessed during deallocation, as discussed in
-  Section~\ref{sec:move-errors}.} The full listing for the code can be found in
+through \InDatalog{path_begins_with_var(P, V)}. This means that we track
+variables that are partially initialised; an over-approximation needed because a
+deallocation of a variable holding a partially initialised \InRust{struct} would
+only be guaranteed to be a no-op if the entire variable was moved at the time of
+the deallocation. The full listing for the code can be found in
 Figure~\ref{fig:var-initialised}.
 
 \begin{figure}
 \begin{sourcecode}
 \begin{minted}{prolog}
-path_maybe_initialized_on_exit(Path, Point) :- 
-    initialized_at(Path, Point).
+path_maybe_initialized_on_exit(Path, Node) :-
+    assigned_at(Path, Node).
 
-path_maybe_initialized_on_exit(Path, Q) :-
-    path_maybe_initialized_on_exit(Path, P),
-    cfg_edge(P, Q),
-    !moved_out_at(Path, Q).
+path_maybe_initialized_on_exit(Path, TargetNode) :-
+    path_maybe_initialized_on_exit(Path, SourceNode),
+    cfg_edge(SourceNode, TargetNode),
+    !moved_out_at(Path, TargetNode).
 
-var_maybe_initialized_on_exit(Var, P) :-
-    path_belongs_to_var(Path, Var),
-    path_maybe_initialized_at(Path, P).
+var_maybe_partly_initialized_on_exit(Var, Node) :-
+    path_maybe_initialized_on_exit(Path, Node),
+    path_begins_with_var(Path, Var).
 \end{minted}
 \end{sourcecode}
 
@@ -2056,9 +2052,9 @@ var_maybe_initialized_on_exit(Var, P) :-
       $\top$ & \begin{tabular}[t]{@{}l  l@{}}
                    Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
-                     \InRust{initialized_at(x, Mid(bb0[0]))}\\
+                     \InRust{path_assigned_at(x, Mid(bb0[0]))}\\
                      \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
-                     \InRust{path_belongs_to_var(x, x)}\\
+                     \InRust{path_begins_with_var(x, x)}\\
                    \end{tabular} &%
                                    
                    \begin{tabular}[t]{@{}l}
@@ -2071,9 +2067,9 @@ var_maybe_initialized_on_exit(Var, P) :-
                    Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{path_maybe_initialized_on_exit(x, Start(bb0[0]))}\\
-                     \InRust{moved_out_at(x, Mid(bb0[0]))}\\
+                     \InRust{path_moved_at(x, Mid(bb0[0]))}\\
                      \InRust{cfg_edge(Start(bb0[0]), Mid(bb0[0]))}\\
-                     \InRust{path_belongs_to_var(x, x)}\\
+                     \InRust{path_begins_with_var(x, x)}\\
                    \end{tabular} &%
                                    \InRust{var_m_i_e(x, Start(bb0[0]))}
                  \end{tabular}\\
@@ -2082,82 +2078,58 @@ var_maybe_initialized_on_exit(Var, P) :-
 
 \caption[Rules for Over-Approximating Variable Initialisation]{The rules for
   over-approximating variable initialisation. A path is trivially initialised
-  where it is actually initialised. It is transitively initialised in all points
-  reachable from a point where it is initialised, and where it has not been
+  where it is actually initialised. It is transitively initialised in all nodes
+  reachable from a node where it is initialised, and where it has not been
   deinitialised (moved out). Variables are initialised if their root path is
   initialised.}\label{fig:var-initialised}
 \end{figure}
 
 \subsection{Under-Estimating Initialisation for Move
   Errors}\label{sec:move-errors}
-\textbf{Warning}: \textit{The code in this section is an entirely unverified
-  draft version, as the addition of new kinds of errors to Polonius requires a
-  significant re-architecture which has not happened at the time of writing.
-  However, such an extension is necessary in order to at all verify the output
-  of these computations, which means that they are at present completely
-  untested. Ongoing discussion can be followed at
-  \url{https://github.com/rust-lang/polonius/pull/135}.}
 
 The principle behind extracting move errors is this: an \textit{error} is an
-\textit{access to a possibly moved or uninitialised path}. Reversing this
-definition gives us: the set of move errors at a given point is the set of path
-accesses, (set) minus those that are \textit{provably initialised} at that
-point. A similar inversion is used to determine the set of provably initialised
-path-point combinations: the set of definitely initialised paths at a point is
-the set of possibly initialised paths at that point (computed in the previous
-section), minus the set of possibly \textit{moved} paths, computed analogously
-to the over-approximated set of initialised ones.
+\textit{access to a possibly moved or uninitialised path}. In order to compute
+this, we mark every function parameter as initialised and every local variable
+as uninitialised at the start of each function, and then propagate the status
+for each variable across the CFG.
 
-These relations are computed in Listings~\ref{lst:move-error} (move
-errors),~\ref{lst:path-definitely-initialised} (provably initialised paths),
-and~\ref{lst:path-maybe-moved} (possibly deinitialised paths).
+These relations are computed in Listings~\ref{lst:move-error} (move errors)
+and~\ref{lst:path-maybe-moved} (possibly uninitialised paths).
 
 \begin{sourcecode}
-  \captionof{listing}{A move error is a path access to any path that is not
-    provably initialised. We use a one-off relation here to move the point of
-    the error one node ahead from the last provably initialised point. This is
-    because if a path is initialised on \textit{exit} from some statement, it is
-    still initialised on \textit{entry} to the next one, which would correspond
-    to the point where the evaluation (but not the effect) of the statement
-    happens. Without this ``rolling up'', we would have a move error on every
-    statement that moves a path, as that statement also accesses the path it
-    moves. With these rules, the path would be accessed at the starting-poing of
-    the move statement, and moved at mid-point, thus avoiding generating an
-    error where they overlap.}\label{lst:move-error}
+  \captionof{listing}{A move error is a path access to any path that may be
+    deinitialised. We use a join with the CFG to move the error one node ahead
+    from the last provably initialised node. This is because if a path is
+    initialised on \textit{exit} from some statement, it is still initialised on
+    \textit{entry} to the next one, which would correspond to the node where
+    the evaluation (but not the effect) of the statement happens. Without this
+    ``rolling up'', we would have a move error on every statement that moves a
+    path, as that statement also accesses the path it moves. With these rules,
+    the path would be accessed at the starting-poing of the move statement, and
+    moved at mid-point, thus avoiding generating an error where they
+    overlap.}\label{lst:move-error}
 \begin{minted}{prolog}
-move_error(Path, Point) :-
-    path_accessed_at(Path, Point),
-    !path_definitely_initialized_on_entry(Path, Point).
-
-path_definitely_initialized_on_entry(Path, Q) :-
-    path_definitely_initialized_on_exit(Path, P),
-    cfg_edge(P, Q).
-\end{minted}
-\end{sourcecode}
-
-\begin{sourcecode}
-  \captionof{listing}{A path is provably initialised if may be initialised and
-    has definitely not been moved.}\label{lst:path-definitely-initialised}
-\begin{minted}{prolog}
-path_definitely_initialized_on_exit(Path, Point) :-
-   path_maybe_initialized_on_exit(Path, Point),
-   !path_maybe_moved_on_exit(Path, Point).
+move_error(Path, TargetNode) :-
+    path_maybe_uninitialized_on_exit(Path, SourceNode),
+    cfg_edge(SourceNode, TargetNode),
+    path_accessed_at(Path, TargetNode).
 \end{minted}
 \end{sourcecode}
 
 \begin{sourcecode}
   \captionof{listing}{A \InDatalog{Path} may have been moved at a
-    \InDatalog{Point} if it was moved on the way there without being
+    \InDatalog{Node} if it was moved on the way there without being
     subsequently reinitialised. This logic is identical to the one used for
     over-approximating initialisation in
     Figure~\ref{fig:var-initialised}.}\label{lst:path-maybe-moved}
 \begin{minted}{prolog}
-path_maybe_moved_on_exit(Path, Point) :- moved_out_at(Path, Point).
+path_maybe_uninitialized_on_exit(Path, Node) :- 
+    path_moved_at(Path, Node).
 
-path_maybe_moved_on_exit(Path, Point2) :-
-    path_maybe_moved_on_exit(Path, Point1),
-    cfg_edge_(Point1, Point2)
-    !initialized_at(Point1, Point2).
+path_maybe_uninitialized_on_exit(Path, Node2) :-
+    path_maybe_uninitialized_on_exit(Path, Node1),
+    cfg_edge_(Node1, Node2)
+    !path_assigned_at(Node1, Node2).
 \end{minted}
 \end{sourcecode}
 
@@ -2165,14 +2137,14 @@ path_maybe_moved_on_exit(Path, Point2) :-
 { \renewcommand{\arraystretch}{1.0}
   \begin{table}[!htbp]    
 \begin{tabular}{@{}l l l l}
-  Statement                & Maybe init                 & Definitely init            & Accessed \\ \toprule
-  \InRust{let x = (2, 3)} & \InRust{x.0}, \InRust{x.1}, \InRust{x} & \InRust{x.0}, \InRust{x.1}, \InRust{x} & \\
-  \InRust{move x.0}        & \InRust{x.1}, \InRust{x}               & \InRust{x.1}, \InRust{x} & \InRust{x.0} \\ % a move
-  \InRust{x.1 + 7}         & \InRust{x.1}, \InRust{x}               & \InRust{x.1}, \InRust{x} & \InRust{x.1} \\ % a legal access to partially deinitialised
-  \InRust{x.0 + 3}         & \InRust{x.1}, \InRust{x}               & \InRust{x.1}, \InRust{x} & \InRust{x.0} \\ % illegal access to partially deinitialised
-  \InRust{x.0 = 4}         & \InRust{x.1}, \InRust{x.0}, \InRust{x} & \InRust{x.1}, \InRust{x.0}, \InRust{x}  \\ % re-initialisation
-  \InRust{if random() {move x.0}}  & \InRust{x.1}, \InRust{x.0}, \InRust{x} & \InRust{x.1}, \InRust{x}        \\ % imprecision
-  \InRust{f(x)}  & \InRust{x.1}, \InRust{x.0}, \InRust{x} & \InRust{x.1}, \InRust{x} & \InRust{x}, \InRust{x.0}, \InRust{x.1}       \\ % access to paths
+  Statement                & Maybe init                 & Maybe uninit            & Accessed \\ \toprule
+  \InRust{let x = (2, 3)} & \InRust{x.0}, \InRust{x.1}, \InRust{x} &  & \\
+  \InRust{move x.0}        & \InRust{x.1}, \InRust{x}               & \InRust{x.0} & \InRust{x.0} \\ % a move
+  \InRust{x.1 + 7}         & \InRust{x.1}, \InRust{x}               & \InRust{x.0} & \InRust{x.1} \\ % a legal access to partially deinitialised
+  \InRust{x.0 + 3}         & \InRust{x.1}, \InRust{x}               & \InRust{x.0} & \InRust{x.0} \\ % illegal access to partially deinitialised
+  \InRust{x.0 = 4}         & \InRust{x.1}, \InRust{x.0}, \InRust{x} &   \\ % re-initialisation
+  \InRust{if random() {move x.0}}  & \InRust{x.1}, \InRust{x.0}, \InRust{x} & \InRust{x.0}        \\ % imprecision
+  \InRust{f(x)}  & \InRust{x.1}, \InRust{x.0}, \InRust{x} & \InRust{x.0} & \InRust{x}, \InRust{x.0}, \InRust{x.1}       \\ % access to paths
 \end{tabular}
 \caption[Move Error Example]{An example of some facts and outputs of key
   relations during the type-verification of a small Rust program. Note that the
@@ -2194,16 +2166,16 @@ path_maybe_moved_on_exit(Path, Point2) :-
   \begin{tabular}{@{}l l m{5.5cm}}
     Atom/Fact & Type & Description \\ \toprule
     Provenance\notmine{} & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine{} & Atom & A point in the control-flow graph. \\
+    Node\notmine{} & Atom & A node in the control-flow graph. \\
     Loan\notmine{} & Atom & A unique borrow expression (\InRust{&x}). \\
     \InDatalog{cfg_edge(P, Q)}\notmine{} & Fact & A transition in the CFG\@. \\
-    \InDatalog{region_live_at(Provenance, Point)} & Fact & This provenance variable is live at this point, and the conditions of its loan must be accepted. \\
-    \InDatalog{borrow_region(Provenance, Loan, Point)}\notmine{} & Fact & A borrow expression at this point creates this loan and this provenance variable. \\
-    \InDatalog{invalidates(Point, Loan)}\notmine{} & Fact & An operation at this point would violate this loan if it were live. \\
-    \InDatalog{subset(Provenance1, Provenance2)}\notmine{} & Intermediate & There is a subset relationship between two provenances at this point. \\
-    \InDatalog{requires(Provenance, Loan, Point)}\notmine{} & Intermediate & This provenance contains this loan at this point. \\
-    \InDatalog{loan_live_at(Loan, Point)}\notmine{} & Intermediate & This loan is live at this point. \\
-    \InDatalog{error(Point)}\notmine{} & Output & A borrow check error (a violated loan) occurred at this point. \\
+    \InDatalog{region_live_at(Provenance, Node)} & Fact & This provenance variable is live at this node, and the conditions of its loan must be accepted. \\
+    \InDatalog{borrow_region(Provenance, Loan, Node)}\notmine{} & Fact & A borrow expression at this node creates this loan and this provenance variable. \\
+    \InDatalog{invalidates(Node, Loan)}\notmine{} & Fact & An operation at this node would violate this loan if it were live. \\
+    \InDatalog{subset(Provenance1, Provenance2)}\notmine{} & Intermediate & There is a subset relationship between two provenances at this node. \\
+    \InDatalog{requires(Provenance, Loan, Node)}\notmine{} & Intermediate & This provenance contains this loan at this node. \\
+    \InDatalog{loan_live_at(Loan, Node)}\notmine{} & Intermediate & This loan is live at this node. \\
+    \InDatalog{error(Node)}\notmine{} & Output & A borrow check error (a violated loan) occurred at this node. \\
     
   \end{tabular}
 \caption{Loan Constraint Propagation Dramatis Personae}\label{tab:polonius-facts-recap}
@@ -2244,9 +2216,9 @@ Table~\ref{tab:borrowck-example}.
 
 The first relation used in Polonius is the \InDatalog{subset(R1, R2, P)}
 relation, which states that~$R_1 \subseteq R_2$ for two provenance
-variables~$R_1, R_2$ at point~$p$ in the CFG, and correspond to the constraints
+variables~$R_1, R_2$ at node~$p$ in the CFG, and correspond to the constraints
 generated during validation of expressions involving subtyping, as discussed in
-Section~\ref{sec:type-system}. Initially, these have to hold at the points where
+Section~\ref{sec:type-system}. Initially, these have to hold at the nodes where
 the constraints are generated by the Rust compiler, as seen by the input
 parameter~\InDatalog{outlives(R1, R2)}. The brief one-liner in
 Listing~\ref{lst:subset-outlives} captures this fact, providing a ``base case''
@@ -2254,7 +2226,7 @@ for the computation. Additionally the mathematical fact that the subset relation
 is transitive is captured in Figure~\ref{fig:subset-transitive}.
 
 \begin{sourcecode}
-  \captionof{listing}{Subset relations hold at the point where they are
+  \captionof{listing}{Subset relations hold at the node where they are
     introduced.}\label{lst:subset-outlives}
 \begin{minted}{prolog}
 subset(R1, R2, P) :- outlives(R1, R2, P).
@@ -2347,8 +2319,8 @@ subset(R1, R2, Q) :-
 These rules describe how provenance variables relate to each other. The other
 part of the logic describes which loans belong to which provenance variable. The
 trivial base case is shown in Listing~\ref{lst:requires-borrow}, which just says
-that each provenance variable~$R$ contains the loan~$L$ that created it at point
-the point~$P$ where the borrow occurred.
+that each provenance variable~$R$ contains the loan~$L$ that created it at node
+the node~$P$ where the borrow occurred.
 
 \begin{sourcecode}
   \captionof{listing}{A provenance variable trivially contains
@@ -2440,11 +2412,11 @@ information into errors.
 
 \subsection{Detecting Loan Violations}
 
-The compiler produces a set of points in the CFG where a loan could possibly be
+The compiler produces a set of nodes in the CFG where a loan could possibly be
 violated (e.g.\ by producing a reference to a value that already has a unique
 reference) in \InDatalog{invalidates(P, L)}. All that remains for Polonius is to
 figure out which loans are live where (Listing~\ref{lst:loan-live}), and
-determine if any of those points intersect with an invalidation of that loan
+determine if any of those nodes intersect with an invalidation of that loan
 (Listing~\ref{lst:error-invalidates}).
 
 \begin{sourcecode}
@@ -2566,10 +2538,10 @@ In this chapter we have seen how Polonius starts with an analysis of move paths
 and their initialisation status. The analysis proceeds across program flow and
 is simultaneously both over- and underapproximating. Initialisation information
 is then used together with variable liveness to determine if a provenance
-variable is live at any given point of the control flow. This information is
+variable is live at any given node of the control flow. This information is
 then used together with the subset relationships created from subtyping
 relations discovered during type-checking to determine which loans may be live
-at which points of the program flow. Joining these two insights together then
+at which nodes of the program flow. Joining these two insights together then
 helps us figure out which loans are live at which program point, which allows us
 to determine if violating them is an error or not. An annotated version of the
 motivating example of Listing~\ref{lst:motivating-example} showing Polonius
@@ -2582,7 +2554,7 @@ below.
     deductions on the motivating
     example. As almost every interesting transition happens inside of the
     assignment, events happening at mid-point are written in comments after the
-    line, and events happening at the start of the point are written at before
+    line, and events happening at the start of the node are written at before
     the line.}\label{lst:motivating-example-deductions}
 \begin{minted}{rust}
 fn next<'buf>(buffer: &'buf mut String) -> &'buf str {
