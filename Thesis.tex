@@ -215,8 +215,6 @@ language treats the scope of a reference, called its lifetime, as part of its
 type, and also provides facilities for the programmer to name and reason about
 them as they would any other type.
 
-% similar but different to Region-based memory
-
 Since its release, the Rust compiler has been extended through proposal RFC~2094
 to add support for so-called non-lexical lifetimes (NLLs), allowing the compiler
 to calculate lifetimes of references based on the control-flow graph rather than
@@ -372,6 +370,41 @@ In our instance, the root variable \InRust{pt} contains the \emph{paths}
 the variable itself. Both the core borrow check and the initialisation tracking
 that we will discuss reasons about variables on the path level, with some
 notable exceptions including vectors and arrays.
+
+\section{Why a Reformulation?}
+\label{sec:background:why}
+
+Polonius' design is driven by shortcomings of the current borrow checker (NLL),
+which does not have the same degree of flow-sensitivity as Polonius provides.
+For this reason, NLL rejects certain desirable patterns of Rust, such as the
+code in Listing~\ref{lst:issue-51132}, that Polonius is designed to accept.
+Leaving out the flow-sensitive analysis of NLL was motivated by performance
+reasons and is one of the motivations for using the Datalog implementation, in
+addition to the intention of having a clearer formulation in a data-oriented
+language.
+
+\begin{sourcecode}
+  \captionof{listing}{A motivating example for Polonius, rejected by the current
+    borrow checker. The code is sound, as the loaned \InRust{event} is either
+    returned out of the loop, or overwritten at the next iteration. Therefore,
+    there are no overlapping mutable loans of
+    \InRust{buffer}.\cite{issue-51132}}\label{lst:issue-51132}
+\begin{minted}{rust}
+fn next<'buf>(buffer: &'buf mut String) -> &'buf str {
+    loop {
+        let event = parse(buffer);
+
+        if true {
+            return event;
+        }
+    }
+}
+
+fn parse<'buf>(_buffer: &'buf mut String) -> &'buf str {
+    unimplemented!()
+}
+\end{minted}
+\end{sourcecode}
 
 \section{The Borrow Check in the Rust Compiler}
 \label{sec:rust-specificts}
@@ -786,10 +819,10 @@ generated whenever a potentially violating operation happens to a live loan.
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/polonius-overview}
-  \caption{An overview of how the parts of Polonius combine for the final
-    output. Blue boxes represent facts and relations implemented during the work
-    on this thesis. Relations are shown using boldface, and inputs in regular
-    font.}
+  \caption{An overview of how the inputs and intermediate steps of Polonius
+    combine into the final output. Blue boxes represent facts and relations
+    implemented during the work on this thesis. Relations are shown using
+    boldface, and facts in regular font.}
   \label{fig:polonius-overview}
 \end{figure}
 
@@ -850,12 +883,6 @@ The following short-hand names are used:
 
 
 \fixme{Update this list for initialisation tracking!}
-
-\subsubsection{Emitting Facts from the Rust Compiler}\label{sec:sec-rustc-fact-generation}
-
-\fixme{A nice illustration of where we hook into the code and what happens there}
-
-\fixme{A description of how and where facts are generated.}
 
 \subsection{Variable Initialisation}
 \label{sec:var-initalisation}
@@ -1053,9 +1080,106 @@ error(P) :-
 \end{minted}
 \end{sourcecode}
 
-\subsection{Illegal Subset Relations}\label{sec:illeg-subs-relat}
+\subsection{What is Missing from Polonius?}\label{sec:missing-features}
 
-\fixme{this isn't implemented yet!!!}
+In addition to polish, comprehensive benchmarking, and performance
+optimisations, there are three important features missing in Polonius before it
+reaches parity with NLL, the current borrow checker.
+
+\subsubsection{Detecting Accesses to Paths that Could Have Been Moved Out}
+\label{sec:missing-features:move}
+
+The current Polonius implementation only uses move data to calculate variables
+that may have components that are initialised in order to determine if they
+might be accessed by a deallocation. However, the full borrow check would also
+calculate paths that \emph{may have been moved out} and emit errors on access,
+such as in this code:
+\begin{minted}{rust}
+let tuple: (Vec<u32>, Vec<u32>) = (vec![], vec![]);
+drop(tuple.0); // moved out of `v`
+println!("{:?}", tuple.0); // ERROR
+\end{minted}
+
+All the necessary input facts are already collected but the actual
+implementation and testing of the logic depends on a re-designed interface to
+Polonius that would allow it to report errors of different kinds, and was not
+performed as part of the work for this thesis.
+
+\subsubsection{Illegal Subset Relations}
+\label{sec:missing-features:illegal-subset-relations}
+
+Polonius currently does not verify that the subset relationships it finds between
+provenance variables is actually valid in itself. For example, this unsound code
+would not generate an error in today's Polonius:
+\begin{minted}{rust}
+fn pick_one<'x, 'y>(x: &'x [u32], y: &'y [u32]) -> &'x u32 {
+    &y[0]
+}
+\end{minted}
+
+In this case, \InRust{pick_one()} takes two slices with some unknown provenance
+variables at least known to live for the duration of the function body. In this
+instance, the subtyping rules would give that \InRust{'y} $\subseteq$
+\InRust{'x} at the end of the function, because the reference into \InRust{y}
+must be a subtype of \InRust{&'x u32}, the return type. However, this cannot be
+guaranteed to hold in general, as Polonius (currently) knows nothing about the
+relationship between these two regions, and in fact, as \InRust{pick_one()} is
+polymorphic over these provenance variables, this must hold for \emph{any} pair
+of provenance variables \InRust{'x, 'y}, which it does
+not~\cite{matsakis_polonius_2019-1}.
+
+\subsubsection{Analysis of Higher Kinds}
+\label{sec:missing-features:higher-kinds}
+
+The final missing functionality in Polonius is interaction with higher-ranked
+subtyping arising from generic functions or trait-matching. The problem was
+described in a blog entry by
+\citeauthor{matsakis_polonius_2019}~\cite{matsakis_polonius_2019} and will
+require extensions in the Rust compiler, which would produce simpler constraints
+for Polonius to solve.
+
+\subsubsection{Provenance Variable Equality Imprecision}
+\label{sec:missing-features:provenance-variable-equality}
+
+During the work for this thesis, a shortcoming in both Polonius and (probably)
+\citeauthor{weiss_oxide:_2019}'s formal formulation of the borrow check was
+discovered, which would generate spurious errors in examples like
+Listing~\ref{lst:polonius-reformulation-bug} where subset relations would cause
+a loan to be propagated to a provenance variable erroneously, leading to
+effectively dead loans being considered live. Correcting this problem would
+require modifications to how the propagation of subset relations across the
+CFG~works, which would not concern the liveness or initialisation tracking
+implemented as part of this thesis, but would affect the solution described in
+Section~\ref{sec:loan-constr-prop}. At the conclusion of the work for this
+theses, the Polonius working group had not yet produced a final reformulation of
+Polonius that would address this issue.
+
+\begin{sourcecode}
+  \captionof{listing}{An example where the current Polonius loses precision and
+    emits a spurious error, as it conflates the provenance variables \InRust{'x}
+    and \InRust{'y}.}\label{lst:polonius-reformulation-bug}
+\begin{minted}{rust}
+let mut z: u32;
+let mut x: &'x u32;
+let mut y: &'y u32;
+
+if something {
+  y = x; // creates `'x: 'y` subset relation
+}
+
+if something {
+  x = &z; // creates {L0} in 'x constraint
+          //   at this point, we have `'x: 'y` and `{L0} in `'x`,
+          //   so we also have `{L0} in 'y`
+  drop(x);
+}
+
+z += 1; // polonius flags an (unnecessary) error
+
+drop(y);
+\end{minted}
+\end{sourcecode}
+
 
 \section{Generating Facts for Polonius in the Rust Compiler}
 
@@ -1087,7 +1211,7 @@ added as part of the work on this thesis.
 All inputs based on provenance variables (that is, the ones with ``region'' in
 their names from the previous terminology); \texttt{path\_belongs\_to\_var},
 \texttt{universal\_region}, \texttt{borrow\_region}, \texttt{var\_uses\_region}, and
-\texttt{outlives} are all generated using information obtained during
+\texttt{outlives}, are all generated using information obtained during
 MIR~type-checking. The rest of the inputs are generated either from walking the
 MIR directly (\texttt{invalidates}, \texttt{cfg\_edge}, and all the facts
 concerning variable uses and drops), or from intermediary indices generated from
