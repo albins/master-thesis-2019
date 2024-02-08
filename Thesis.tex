@@ -17,7 +17,7 @@
 
 
 %\documentclass{UUThesisTemplate}
-\documentclass[11pt,a4paper,twoside,openany]{report}
+\documentclass[11pt,a4paper,twoside,openany,draft]{report}
 
 \author{Albin Stjerna}
 \date{\today}
@@ -160,6 +160,9 @@
 
 \title{Modelling Rust's Reference Ownership Analysis Declaratively in Datalog}
 
+\definecolor{red}{rgb}{1.0, 0.41, 0.38}
+\definecolor{green}{rgb}{0.47, 0.87, 0.47}
+
 \begin{document}
 % Sync the counters:
 \counterwithin{listing}{section}
@@ -230,40 +233,54 @@ runtimes, and would therefore be useful proxies for the difficulty of an input.
 
 Rust is a young systems programming language originally developed at Mozilla
 Research~\cite{matsakis_rust_2014}. Its stated intention is to combine
-high-level programming language features like automatic memory management and
-strong safety guarantees with predictable performance and pay-as-you-go
-abstractions in systems languages like C++. Particular attention is given to
-guarantees of safety and against data races in concurrent programs.
+high-level features like automatic memory management and strong safety
+guarantees with predictable performance and pay-as-you-go abstractions in
+systems languages like C++. Particular attention is given to protection against
+data races in concurrent programs.
 
-One of its core features is the memory ownership model, which enables
-compile-time safety guarantees against data races, unsafe pointer dereferencing,
-and runtime-free automatic memory management.
+One of Rust's core features is the memory ownership model, which gives
+compile-time safety guarantees against access to uninitialised memory and data
+races in addition to enabling runtime-free automatic memory management. This
+model is enforced by a memory safety checker called the borrow check. The borrow
+check ensures that no memory access reaches uninitialised memory, and that any
+shared memory is never written for the duration of the sharing. Finally, it also
+protects against dangling references and references to stack-allocated memory
+that may be outside of the scope of an accessor, disallowing for example a
+function to return a reference to memory allocated on its stack. The rules
+themselves are discussed at a higher level in Section~\ref{sec:borrowing-rules},
+and related to the type system Oxide in Section~\ref{sec:type-system}. In
+essence, the borrow checker is a program (or module) that takes as its input a
+Rust program (possibly in reduced form) and produces a description of which
+parts of the code violates the rules of the memory ownership model.
 
-This report describes the implementation of an experimental next-generation
-memory safety checker for Rust called Polonius in an embedded Datalog engine. In
-practice, the full analysis encompasses a variable liveness analysis,
-initialisation and deinitialisation tracking (mostly implemented as part of the
-work on this thesis), and may-reference analysis for validation of Rust's memory
-safety guarantees and alias control.
+This report describes a partial implementation of an experimental borrow checker
+called Polonius. Polonius specifically increases the reasoning power of the
+borrow check to reason at the level of individual program statements (a
+flow-sensitive analysis), allowing it to accept previously rejected but
+desirable patterns of Rust, such as the example shown in
+Listing~\ref{lst:motivating-example}.
 
-Finally, the report investigates Polonius inputs generated from Rust code found
-in ca 20~000 popular publicly available Git repositories found on Crates.io and
-GitHub. The analysis evaluates the viability of hybrid modes of analysis where a
-simpler and faster analysis is performed before engaging the full flow-sensitive
-analysis, and studies what a typical input for the borrow check might look like
-in practice.
+In practice, Polonius' analysis encompasses a variable liveness analysis
+(Section~\ref{sec:var-livenes}), initialisation tracking
+(Section~\ref{sec:var-initalisation}), and may-reference analysis for validation
+of Rust's memory safety guarantees and alias control
+(Section~\ref{sec:loan-constr-prop}), used to statically enforce safe use of
+shared memory. In practice, these rules can be understood as read and
+write-capable locks on a section of memory, placed by the compiler at
+compile-time.
 
-The contributions made within the scope of the thesis project specifically
-includes the implementation of liveness and initialisation calculations
-(Sections~\ref{sec:var-livenes} and~\ref{sec:var-initalisation} respectively).
-Finally, the report also evaluates the runtime performance of the system,
-suggesting potential optimisations in Section~\ref{sec:optim-borr-check}, and
-performs a field study of the shape of input data in
-Section~\ref{sec:field-study-borrow}. The core rules of Polonius for the
-provenance variable constraints were already written when the project started.
-They are still described in Section~\ref{sec:loan-constr-prop} for completeness.
-For clarity, sections detailing components not developed as part of this thesis
-are marked with~(\notmine{}).
+The contributions made in this thesis specifically includes the implementation
+of liveness and initialisation calculations (Sections~\ref{sec:var-livenes}
+and~\ref{sec:var-initalisation} respectively) in Polonius, previously computed
+in the Rust compiler. Additionally, this report investigates Polonius
+performance on real-world Rust code found in ca 12~000 popular publicly
+available Git repositories found on Crates.io and GitHub
+(Section~\ref{sec:field-study-borrow}). It compares two optimised variants of
+the analysis to a baseline naive analysis, and produces statistics on which
+types of inputs to Polonius typically dominate, drawing some conclusions on
+common coding patterns. For clarity, sections detailing components not developed
+as part of this thesis (but included for completeness) are marked
+with~(\notmine{}).
 
 \chapter{Background}
 Whenever a reference to a resource is created in Rust, its borrowing rules
@@ -274,6 +291,8 @@ language treats the scope of a reference, conventionally called its lifetime, as
 part of its type, and also provides facilities for the programmer to name and
 reason about them as they would any other type.
 
+
+% This reference to NLLs is unclear; probably just drop it.
 {\sloppy
 Since its release, the Rust compiler has been extended through proposal RFC~2094
 to add support for so-called non-lexical lifetimes (NLLs), allowing the compiler
@@ -290,6 +309,7 @@ borrow check in terms of lifetimes, now centering it around the concept of the
 loans giving rise to references.}
 
 \section{Previous Research}
+% This sentence is too long, and should be butchered anyways:
 Datalog, and other types of logic programming has been previously employed for
 program analysis, in particular pointer analyses such as may-point-to and
 must-point-to analysis, both similar to what is described in this report in that
@@ -332,42 +352,6 @@ Polonius is discussed further in Section~\ref{sec:type-system}.
 
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
 
-
-\begin{tabular}{p{0.18\textwidth} p{0.41\textwidth} p{0.41\textwidth}}
-  Rule & Positive Example & Negative Example \\ \hline
-  Use-Init&
-  \begin{minipage}[t]{0.41\textwidth}
-    \begin{minted}[autogobble]{rust}
-     let x: u32;
-
-     if random() {
-         x = 17;
-     } else {
-         x = 18;
-     }
-
-     let y = x + 1;
-    \end{minted}
-  \end{minipage}&
-  \begin{minipage}[t]{0.41\textwidth}
-    \begin{minted}[escapeinside=||, autogobble]{rust}
-     let x: u32;
-
-     if random() {
-         x = 17;
-     }
-
-     // ERROR: x not initialized:
-     let y = |\colorbox{red}{x}| + 1; 
-    \end{minted}
-  \end{minipage} \\
-  Move-Deinit & EXAMPLE & EXAMPLE \\
-  Shared-Read & EXAMPLE & EXAMPLE \\
-  Unique-Write & EXAMPLE & EXAMPLE
-  
-\end{tabular}
-% FIXME: better error colours!
-
 Conceptually, the borrow check verifies that Rust's ownership rules of shared
 memory are respected. Memory is owned by the scope (typically a function, block,
 or data structure) that has allocated it, and will be deallocated upon leaving
@@ -380,78 +364,149 @@ access. It also verifies that accesses to shared memory through loans respect
 the terms of that loan. A shared reference cannot be mutated, and must be
 guaranteed to be free from use-after-frees.
 
-This section will demonstrate the rules enforced by the borrow check. Most of
-these examples are taken directly or slightly modified from
-\citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
+A sumary of the rules enforced by the borrow check can be found in
+Table~\ref{tab:borrow-check}. Many of these examples are taken directly or
+slightly modified from \citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 
-\begin{description}  
-\item[Variables must be provably initialised before use] Whenever a variable is
-  used, it must be unconditionally initialised:
-  \begin{minted}{rust}
+{ \renewcommand{\arraystretch}{2.0}
+\begin{table}[h]
+\begin{tabular}{p{0.18\textwidth} p{0.41\textwidth} p{0.41\textwidth}}
+  Rule & Positive Example & Negative Example \\ \hline
+  Use-Init & % Positive example:
+  \begin{minipage}[t]{0.41\textwidth}
+    \begin{minted}[escapeinside=||, autogobble]{rust}
      let x: u32;
-     let y = x + 1; // ERROR: x is not initialised
-  \end{minted}
-\item[A move deinitialises a variable] Whenever ownership of a variable is
-  passed on (\emph{moved} in Rust parlance), e.g. by a method call or use in an
-  assignment, the variable becomes deinitialised:
-  \begin{minted}{rust}
-    struct Point(u32, u32);
-    
-    let mut pt = Point(6, 9);
-    let x = pt;
-    let y = pt; // ERROR: pt was already moved to x
-  \end{minted}
-\item[There can be any number of shared references] A shared reference, also
-  called a \textit{loan} of a \textit{borrowed} variable, is created with the
-  \InRust{&} operator, and there can be any number of simultaneously live shared
-  references to a variable:
-  \begin{minted}{rust}
-    struct Point(u32, u32);
-    
-    let mut pt = Point(6, 9);
-    let x = &pt;
-    let y = &pt; // This is fine
-  \end{minted}
-\item[There can only be one simultaneous live unique reference] Whenever a
-  unique reference is created, with \InRust{&mut}, it must be unique:
-  \begin{minted}{rust}
-    struct Point(u32, u32);
-    
-    let mut pt = Point(6, 9);
-    let x = &mut pt;
-    let y = &mut pt; // ERROR: pt is already borrowed
-    
-    // code that uses x and y
-  \end{minted}
 
-  This error happens even if the first borrow is shared, but not if
-  either \InRust{x} or \InRust{y} are dead (not used).
-  
-\item[A reference must not outlive its referent] A reference must go out of
-  scope at the very latest at the same time as its referent, protecting against
-  use-after-frees:
-  \begin{minted}{rust}
-    struct Point(u32, u32);
+     if random() {
+         |\colorbox{green}{x =}| 17;
+     } else {
+         |\colorbox{green}{x =}| 18;
+     }
+
+     let y = |\colorbox{green}{x}| + 1;
+    \end{minted}
+  \end{minipage}&% Negative example:
+  \begin{minipage}[t]{0.41\textwidth}
+    \begin{minted}[escapeinside=||, autogobble]{rust}
+     let x: u32;
+
+     if random() {
+         |\colorbox{green}{x =}| 17;
+     }
+
+     // ERROR: x not initialized:
+     let y = |\colorbox{red}{x}| + 1; 
+    \end{minted}
+  \end{minipage} \\
+  Move-Deinit&% Positive example of move-deinit
+\begin{minipage}[t]{0.41\textwidth}
+    \begin{minted}[escapeinside=||,autogobble]{rust}
+    let tuple = (vec![1], vec![2]);
+
+    moves_argument(|\colorbox{green}{tuple.1}|);
+
+    // Does not overlap tuple.1:
+    let x = |\colorbox{green}{tuple.0}|[0];
+\end{minted}
+\end{minipage}&% Negative example of move-deinit
+  \begin{minipage}[t]{0.41\textwidth}
+    \begin{minted}[escapeinside=||, autogobble]{rust}
+    let tuple = (vec![1], vec![2]);
+
+    moves_argument(|\colorbox{green}{tuple.0}|);
+
+    // ERROR: use of moved value:
+    let x = |\colorbox{red}{tuple.0}|[0];
+\end{minted}
+  \end{minipage}\\
+  Shared-Readonly&% Positive example of shared-readonly
+\begin{minipage}[t]{0.41\textwidth}
+\begin{minted}[escapeinside=||, autogobble]{rust}
+struct Point(u32, u32);
+let mut pt = Point(13, 17);
     
-    let x = {
-        let mut pt = Point(6, 9);
-        &pt
-    };
+let x = |\colorbox{green}{&pt}|;
+let y = |\colorbox{green}{&pt}|;
     
-    let z = x.0; // ERROR: pt does not live long enough
-  \end{minted}
+dummy_use(|\colorbox{green}{x}|); dummy_use(|\colorbox{green}{y}|);
+\end{minted}
+\end{minipage}&% Negative example of shared-readonly
+  \begin{minipage}[t]{0.41\textwidth}
+\begin{minted}[escapeinside=||, autogobble]{rust}
+struct Point(u32, u32);
+let mut pt = Point(13, 17);
+    
+let x = |\colorbox{green}{&pt}|;
+// ERROR: assigned to
+//   borrowed value:
+|\colorbox{red}{pt.0 += 1}|;
+dummy_use(|\colorbox{green}{x}|);
+\end{minted}
+  \end{minipage}\\
+  Unique-Write&% Positive example of unique-write
+\begin{minipage}[t]{0.41\textwidth}
+\begin{minted}[escapeinside=||, autogobble]{rust}
+struct Point(u32, u32);
+let mut pt = Point(13, 17);
+    
+let x = |\colorbox{green}{&mut pt}|;
+let y = |\colorbox{green}{&mut pt}|;
 
-  In this example, we try to set \InRust{x} to point to the variable \InRust{pt}
-  inside of a block that has gone out of scope before \InRust{x} does.
-\end{description}
+//dummy_use(x);
+dummy_use(|\colorbox{green}{y}|);
+\end{minted}
+\end{minipage}&% Negative example of unique-write
+  \begin{minipage}[t]{0.41\textwidth}
+    \begin{minted}[escapeinside=||, autogobble]{rust}
+struct Point(u32, u32);
+let mut pt = Point(13, 17);
+    
+let x = |\colorbox{red}{&mut pt}|;
+// ERROR: cannot borrow `pt`
+// as mutable more than once:
+let y = |\colorbox{red}{&mut pt}|;
+
+dummy_use(|\colorbox{red}{x}|);
+dummy_use(|\colorbox{green}{y}|);
+\end{minted}
+  \end{minipage}\\
+  Ref-Live&% Positive example of ref-live
+\begin{minipage}[t]{0.41\textwidth}
+\begin{minted}[escapeinside=||, autogobble]{rust}
+struct Point(u32, u32);
+let pt = Point(6, 9);
+let x = {
+    |\colorbox{green}{&pt}|
+}; // pt still in scope
 
 
-It is worth pointing out that the move semantics, corresponding to affine types,
-only applies to types that are not cheaply clonable, indicated by them
-implementing the \InRust{Copy} trait. In that case, any move would instead
-automatically become a copy, using value semantics rather than reference
-semantics. This is why the examples above do not use simpler types like
-integers, which are copyable and thus would not cause a move to happen.
+let z = |\colorbox{green}{x.0}|;
+\end{minted}
+\end{minipage}&% Negative example of ref-live
+  \begin{minipage}[t]{0.41\textwidth}
+\begin{minted}[escapeinside=||, autogobble]{rust}
+struct Point(u32, u32);
+let x = {
+    let pt = Point(6, 9);
+    |\colorbox{red}{&pt}|
+}; // pt goes out of scope
+
+// ERROR: pt does not live
+// long enough:
+let z = |\colorbox{red}{x.0}|; 
+\end{minted}
+  \end{minipage}
+\end{tabular}
+\caption[The Rules of the Borrow Check]{The Rules of the borrow check, with
+  positive (free from errors) and negative (with errors) examples.
+  Highlighted code shows sub-expressions that would perform the borrow check,
+  such as mutating, moving, or reading a variable. Green highlights show
+  accepted uses and red ones show failed ones.}
+  \label{tab:borrow-check}
+\end{table}%
+}
+
+% Actually go through the rules top-to-bottom
 
 \subsection{Variables, Places, and Paths}
 \label{sec:vars-places-paths}
@@ -487,23 +542,25 @@ example, the path \InRust{x.y} would have the prefixes \InRust{x} and
 \InRust{x.y}. Prefixes will also come up in initialisation tracking, and in the
 borrow check itself.
 
-\section{Why a Reformulation?}
-\label{sec:background:why}
+\section{Why a Reformulation?}\label{sec:background:why}
 
-Polonius' design is driven by shortcomings of the current borrow checker (NLL),
-which does not have the same degree of flow-sensitivity as Polonius provides.
-For this reason, NLL rejects certain desirable patterns of Rust that Polonius is
-designed to accept, such as the code in Listing~\ref{lst:issue-51132}. Leaving
-out the flow-sensitive analysis of NLL was motivated by performance reasons and
-is one of the motivations for using Datalog, in addition to the intention of
-having a clearer formulation in a data-oriented language.
+The two main reasons for the reformulation are a more powerful system of
+analysis, and a clearer expression of the language semantics through the use of
+a domain-specific language. Polonius' design is driven by shortcomings of the
+current borrow checker (NLL), which does not have the same degree of
+flow-sensitivity as Polonius provides. For this reason, NLL rejects certain
+desirable patterns of Rust that Polonius is designed to accept, such as the code
+in Listing~\ref{lst:issue-51132}. Leaving out the flow-sensitive analysis of NLL
+was motivated by performance reasons and is one of the motivations for using
+Datalog, in addition to the advantages of using a domain-specific language that
+is well-suited for performing the types of flow analysis used in Polonius.
 
 \begin{sourcecode}
   \captionof{listing}[Motivating example for Polonius]{A motivating example for
     Polonius, rejected by the current borrow checker. The code is sound, as the
     loaned \InRust{event} is either returned out of the loop, or overwritten at
     the next iteration. Therefore, there are no overlapping mutable loans of
-    \InRust{buffer}.\cite{issue-51132}}\label{lst:issue-51132}
+    \InRust{buffer}.~\cite{issue-51132}}\label{lst:issue-51132}
 \begin{minted}{rust}
 fn next<'buf>(buffer: &'buf mut String) -> &'buf str {
     loop {
@@ -524,7 +581,7 @@ fn parse<'buf>(_buffer: &'buf mut String) -> &'buf str {
 \section{The Borrow Check in the Rust Compiler}
 \label{sec:rust-specificts}
 
-\begin{figure}
+\begin{figure}[h!]
   \includegraphics[width=0.9\linewidth]{Graphs/rustc-overview}
   \caption[The Rust Compilation Process]{An overview of the Borrow Check's place
     in the process of compiling Rust code, as described in the Rust Developer's
@@ -538,7 +595,7 @@ intermediate representation of Rust called the Mid-Level Intermediate
 Representation (MIR), corresponding to the basic blocks of program control flow.
 Rust is lowered to MIR after regular type checking and after a series of earlier
 transformations, as seen in Figure~\ref{fig:rustc-overview}. The Polonius
-analysis is executed at the function level, checking a function at a time.
+analysis is executed at the function level, checking a function at a time. 
 
 The input data to Polonius is generated in the Rust compiler by analysing this
 intermediate representation. This means that we can safely assume to be working
@@ -547,27 +604,15 @@ as opposed to complex expressions involving multiple variables on the right-hand
 side.
 
 \begin{figure}
-  \includegraphics[width=0.65\linewidth]{Graphs/mir-example}
-  \caption[MIR of a Small Rust Program With
-  Function Call]{A graph rendering of the \InRust{main()} function from the Rust
-    program in Listing~\ref{lst:mir-example-input}, illustrating branching
-    (block 0), and a function call (5). Note the \texttt{unwind}~arm of
-    block~5's terminator (last line), which will be followed if the function
-    call panics, that is if something goes wrong during the call.}
-  \label{fig:mir-example}
-\end{figure}
-
-The MIR consists of basic blocks in the traditional compilers sense, each
-containing a set of statements and usually ending with a \emph{terminator}, an
-expression providing a branching to other basic blocks~\cite{mir_rfc}. A
-rendering of the MIR of the program in Listing~\ref{lst:mir-example-input} can
-be seen in Figure~\ref{fig:mir-example}.
-
-\begin{sourcecode}
+\noindent
+\begin{minipage}{.5\textwidth}
+\includegraphics[width=\linewidth]{Graphs/mir-example}
+\end{minipage}% This must go next to `\end{minipage}`
+\begin{minipage}{.5\textwidth}
+  \begin{sourcecode}
   \captionof{listing}{A minimal Rust program featuring branching and a function
-    call. The MIR~form of this program is shown in
-    Figure~\ref{fig:mir-example}.}\label{lst:mir-example-input}
-\begin{minted}{rust}
+    call.}\label{lst:mir-example-input}
+\begin{minted}[linenos]{rust}
 fn main() {
     let x = 17;
     let z = if x == 3 {
@@ -580,6 +625,27 @@ fn main() {
 }
 \end{minted}
 \end{sourcecode}
+\end{minipage}
+\caption[MIR of a Small Rust Program With Function Call]{A graph rendering
+  (left) of the \InRust{main()} function from a Rust program (right),
+  illustrating branching (block 0, corresponding to lines 2--3), and a function
+  call (5, corresponding to line 9). Note the \texttt{unwind}~arm of block~5's
+  terminator (last line), which will be followed if the function call panics,
+  that is if something goes wrong during the call. Blocks~3 and~4 correspond to
+  the assignment of the value of the \InRust{if} statement on line 3, assigning
+  either \InRust{92} (block~4) or \InRust{x} (block~3) to \InRust{z}. The
+  successful return block,~6, contains a number of stack deallocation hints for
+  later compilation steps, and sets up the return value of \InRust{main()},
+  \InRust{_0} to be the empty tuple (corresponding to \texttt{void} in a
+  C~program).}
+  \label{fig:mir-example}
+\end{figure}
+
+The MIR consists of basic blocks in the traditional compilers sense, each
+containing a set of statements and usually ending with a \emph{terminator}, an
+expression providing a branching to other basic blocks~\cite{mir_rfc}. A
+side-to-side comparison between a small Rust program and its MIR can be seen in
+Figure~\ref{fig:mir-example}.
 
 \section{From Lifetimes to Provenance Variables}
 \label{sec:reference-provenance}
@@ -932,14 +998,15 @@ computation~\cite{afrati_datalog_1995}. It describes fixpoint calculations over
 logical relations as predicates, described as fixed input \emph{facts}, computed
 \emph{relations}, or \emph{rules} describing how to populate the relations based
 on facts or other relations. For example, defining a fact describing that an
-individual is another individual's parent might look like
-\InDatalog{parent(mary, john).}, while computing the \InDatalog{ancestor}
+individual is another individual's child might look like
+\InDatalog{child(mary, john).}, while computing the \InDatalog{ancestor}
 relation could then use the two rules, reflecting the fact that ancestry is
-respectively either direct parenthood or transitive parenthood (example from the
-Wikipedia article on Datalog~\cite{wiki:datalog}):
+respectively either direct parenthood or transitive parenthood:
 \begin{minted}{rust}
-ancestor(X, Y) :- parent(X, Y).
-ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+ancestor(Mother, Daughter) :- child(Daughter, Mother).
+ancestor(Grandmother, Daughter) :- 
+    child(Mother, Grandmother),
+    ancestor(Mother, Daughter).
 \end{minted}
 
 Datafrog~\cite{datafrog} is a minimalist Datalog implementation embedded in
@@ -950,18 +1017,51 @@ computation. Static facts are described as \InRust{Relation}s, while dynamic
 \InRust{Variable}s are used to capture the results of computations, both of
 which are essentially sets of tuples, in our case tuples of integers. Rules are
 described using a join with either a \InRust{Variable} or a \InRust{Relation},
-with an optimised join method used for joins with only one variable. Only
-single-step joins on the first tuple element are possible, which means that more
-complex rules must be written with intermediary variables, and manual indices
-created whenever a relation must be joined on a variable which is not the first
-in the tuple.
+with an optimised join method used for joins with only one variable, but
+multiple relations. Only single-step joins on the first tuple element are
+possible, which means that more complex rules must be written with intermediary
+variables, and manual indices created whenever a relation must be joined on a
+variable which is not the first in the tuple. An example of the
+\InDatalog{ancestor} relation in Datafrog can be seen in
+Listing~\ref{lst:datafrog:ancestor}.
 
 \begin{sourcecode}
-  \captionof{listing}{The implementation of \InDatalog{var_live(V, P)} in
+  \captionof{listing}[\InDatalog{ancestor(X, Y)} in
+  Datafrog.]{\InDatalog{ancestor(X, Y)} in Datafrog. Note the \InRust{map()}
+    invocation, which reverses the tuples of the input \InRust{Vec} to fit the
+    reversed target order. This example is used in work-in-progress Polonius
+    code used to derive children of move paths, which is otherwise left outside
+    of the scope of this thesis.}\label{lst:datafrog:ancestor}
+\begin{minted}{rust}
+let ancestor = iteration.variable::<(T::Path, T::Path)>("ancestor");
+
+// ...
+
+// ancestor(Mother, Daughter) :- child(Daughter, Mother).
+ancestor.insert(
+    child
+        .iter()
+        .map(|&(child_path, parent_path)| (parent_path, child_path))
+        .collect(),
+);
+
+// ancestor(Grandmother, Daughter) :-
+ancestor.from_join(
+    &ancestor, // ancestor(Mother, Daughter),
+    &child,    // child(Mother, Grandmother).
+    // select the appropriate part of the match:
+    |&_mother, &daughter, &grandmother| (grandmother, daughter),
+);
+\end{minted}
+\end{sourcecode}
+
+
+\begin{sourcecode}
+  \captionof{listing}{The implementation of \InDatalog{var_use_live(V, P)} in
     Datafrog.}\label{lst:datafrog:var-live}
 \begin{minted}{rust}
-var_live_var.from_leapjoin(
-    &var_live_var,
+var_use_live_var.from_leapjoin(
+    &var_use_live_var,
     (
         var_defined_rel.extend_anti(|&(v, _q)| v),
         cfg_edge_reverse_rel.extend_with(|&(_v, q)| q),
@@ -971,8 +1071,8 @@ var_live_var.from_leapjoin(
 \end{minted}
 \end{sourcecode}
 
-As an example, the Datafrog code for \InDatalog{var_live(V, P)} of
-Listing~\ref{lst:var-live} becomes the code in
+Moving on with a more complex example, the Datafrog code for
+\InDatalog{var_use_live(V, P)} of Listing~\ref{lst:var-live} becomes the code in
 Listing~\ref{lst:datafrog:var-live}, and the corresponding join used for the
 first half of \InDatalog{region_live_at(R, P)} of
 Listing~\ref{lst:region-live-at} can be seen in
@@ -1015,7 +1115,7 @@ two-tuples.
 
 For more complex joins where a single variable participates in the join and all
 other arguments are static \InRust{Relation}s (such as is the case with the
-variable~\InRust{var_live_var} of Listing~\ref{lst:datafrog:var-live}), there is
+variable~\InRust{var_use_live_var} of Listing~\ref{lst:datafrog:var-live}), there is
 \InRust{from_leapjoin}. In this case, the input is the sole dynamic source
 variable, a tuple of ``leapers'', and a combining function like the one in
 \InRust{from_join}, but with the signature like the one above, mapping a matched
@@ -1029,7 +1129,7 @@ mapping tuples from the \InRust{Variable} to \InRust{Key}s in the
 tuples matching \InRust{Key} are discarded.
 
 In Listing~\ref{lst:datafrog:var-live}, we can see a leapjoin populating
-\InRust{var_live_var} with tuples produced by joining the \InRust{Relation}s
+\InRust{var_use_live_var} with tuples produced by joining the \InRust{Relation}s
 representing \InRust{var_defined_rel} and the reversed CFG.
 
 In this thesis, we will use the notation of Souffl{\'e}~\cite{scholz_fast_2016}
@@ -1039,9 +1139,21 @@ safe to forget you ever read this one.
 
 \chapter{A Declarative Model of the Rust Borrow Check}
 \label{cha:investigation}
-% \epigraph{\fixme{short quote}}
+%\epigraph{\fixme{short quote}}
 
-\section{The Borrow Checker in Datalog}\label{sec:borr-check-datal}
+In this chapter, we will describe the current implementation of Polonius in
+Datalog (forgetting the horrors of Datafrog in Section~\ref{sec:datalog}). We
+will start by discussing how information (``facts'') extracted from the
+user-supplied program via the MIR (introduced in
+Section~\ref{sec:rust-specificts}) flows through the Polonius analysis to
+determine if and where the conditions of a loan are violated. We will then go
+into detail about the actual Datalog rules of Polonius in
+Section~\ref{sec:borr-check-datal}, discuss how the input facts are generated in
+the Rust compiler (Section~\ref{lst:polonius-fact-emission}), and finish up by
+discussing what is missing in Polonius in order to perform a full analysis
+(Section~\ref{sec:missing-features}).
+
+\section{The Borrow Check in Datalog}\label{sec:borr-check-datal}
 
 An overview of Polonius can be seen in Figure~\ref{fig:polonius-overview}:
 initialisation is calculated in order to calculate drop-liveness, which together
@@ -1235,10 +1347,10 @@ which branch is taken.
     transition $P\rightarrow{}Q$, and it was not defined (killed) in
     $P$.}\label{lst:var-live}
 \begin{minted}{prolog}
-var_live(V, P) :- var_used(V, P).
+var_use_live(V, P) :- var_used(V, P).
 
-var_live(V, P) :-
-    var_live(V, Q),
+var_use_live(V, P) :-
+    var_use_live(V, Q),
     cfg_edge(P, Q),
     !var_defined(V, P).
 \end{minted}
@@ -1303,7 +1415,7 @@ region_live_at(R, P) :-
     var_drops_region(V, R).
         
 region_live_at(R, P) :-
-        var_live(V, P),
+        var_use_live(V, P),
         var_uses_region(V, R).
 \end{minted}
 \end{sourcecode}
@@ -1442,6 +1554,85 @@ error(P) :-
 \end{minted}
 \end{sourcecode}
 
+
+\section{Generating Facts for Polonius in the Rust Compiler}
+
+As stated above, the Polonius analysis is performed on the MIR, and the results
+are then mapped back onto the source code when generating user-facing errors.
+While Polonius is a self-contained package with a well-defined interface,
+however, the interface to the code performing the translation of
+compiler-internal data structures into input facts for Polonius has a much
+larger surface area. All the additions to the Rust compiler occurs in the
+\texttt{librustc\_mir::borrow\_check::nll}~module, that is alongside the current
+borrow checker (``NLL''). The module hierarchy and the location of emission of
+the various facts is shown in Figure~\ref{fig:fact-module-hierarchy}. It is
+worth noting that the Polonius analysis piggy-backs off of previous analysises,
+notably the \texttt{outlives} constraints generated by the previous borrow
+checker during type-checking.
+
+All facts except \texttt{invalidates}, \texttt{cfg\_edge}, \texttt{killed},
+\texttt{borrow\_region}, \texttt{outlives}, and \texttt{universal\_region} were
+added as part of the work on this thesis.
+
+\begin{figure}
+  \includegraphics[width=0.9\linewidth]{Graphs/rustc-module-structure}
+  \caption[Polonius In Rust's Module Hierarchy]{An illustration of where in the
+    module hierarchy of the Rust compiler the various facts are emitted.
+    Underscores are replaced with white space for readability. Blue boxes
+    represent facts, and black boxes (sub-)modules.}
+  \label{fig:fact-module-hierarchy}
+\end{figure}
+
+All inputs based on provenance variables (that is, the ones with ``region'' in
+their names from the previous terminology); \texttt{path\_belongs\_to\_var},
+\texttt{universal\_region}, \texttt{borrow\_region}, \texttt{var\_uses\_region},
+and \texttt{outlives}, are all generated using information obtained during
+MIR~type-checking. The rest of the inputs are generated either from walking the
+MIR directly (\texttt{invalidates}, \texttt{cfg\_edge}, and all the facts
+concerning variable uses and drops), or from intermediary indices generated from
+the MIR in earlier parts of the compilation process (all facts related to move
+paths, which are identified by previous compilation steps). All of this suggests
+that the design shown in Figure~\ref{fig:fact-module-hierarchy} should be
+refactored to reflect these data dependencies, unifying the generation of most
+facts into a common Polonius module higher up in the hierarchy, and leaving only
+the ones needing the transient and internal output from the type checker (i.e
+provenance variables and their relations to each other and to variables) under
+the \texttt{type\_check} submodule. This possible future design is discussed in
+more detail in Chapter~\ref{cha:conclusions}.
+
+Returning to one of the examples of the borrowing rules in
+Section~\ref{sec:borrowing-rules}, we can describe some of the facts that would
+be output on each line. An annotated example can be seen in
+Listing~\ref{lst:polonius-fact-emission}.
+
+\begin{sourcecode}
+  \captionof{listing}{A minimal example of a violated loan in Rust and the
+    Polonius input facts it would produce during
+    compilation.}\label{lst:polonius-fact-emission}
+\begin{minted}{rust}
+    let mut pt = Point(6, 9); // var_defined(pt)
+    let x = &mut pt;  // var_defined(x),
+                      // var_used(pt),
+                      // borrow_region('1, b0)
+                      // outlives('1, 'x)
+                      // var_uses_region(x, 'x)
+    let y = &mut pt;  // invalidates(b0)
+                      // ...
+
+   // we assume var_used(x), var_used(y) is emitted here.
+\end{minted}
+\end{sourcecode}
+
+In practice, this would happen at the MIR level, which would introduce
+intermediary variables. However, the core reasoning is the same: the right-hand
+side of the assignment is typed with a provenance variable \InRust{'1},
+containing only that loan. The assignment to \InRust{x} then sets up a subtyping
+relationship with the corresponding \InDatalog{outlives('1, 'x)} fact that
+propagates it to \InRust{x}'s provenance variable \InRust{'x}, ensuring it is
+considered live when the loan on the next line generates a fact
+\InRust{invalidates(b0)}, resulting in the eventual derivation of an
+\InRust{error}.
+
 \section{What is Missing from Polonius?}\label{sec:missing-features}
 
 In addition to polish, comprehensive benchmarking, and performance
@@ -1548,86 +1739,7 @@ drop(y);
 \end{minted}
 \end{sourcecode}
 
-
-\section{Generating Facts for Polonius in the Rust Compiler}
-
-As stated above, the Polonius analysis is performed on the MIR, and the results
-are then mapped back onto the source code when generating user-facing errors.
-While Polonius is a self-contained package with a well-defined interface,
-however, the interface to the code performing the translation of
-compiler-internal data structures into input facts for Polonius has a much
-larger surface area. All the additions to the Rust compiler occurs in the
-\texttt{librustc\_mir::borrow\_check::nll}~module, that is alongside the current
-borrow checker (``NLL''). The module hierarchy and the location of emission of
-the various facts is shown in Figure~\ref{fig:fact-module-hierarchy}. It is
-worth noting that the Polonius analysis piggy-backs off of previous analysises,
-notably the \texttt{outlives} constraints generated by the previous borrow
-checker during type-checking.
-
-All facts except \texttt{invalidates}, \texttt{cfg\_edge}, \texttt{killed},
-\texttt{borrow\_region}, \texttt{outlives}, and \texttt{universal\_region} were
-added as part of the work on this thesis.
-
-\begin{figure}
-  \includegraphics[width=0.9\linewidth]{Graphs/rustc-module-structure}
-  \caption[Polonius In Rust's Module Hierarchy]{An illustration of where in the
-    module hierarchy of the Rust compiler the various facts are emitted.
-    Underscores are replaced with white space for readability. Blue boxes
-    represent facts, and black boxes (sub-)modules.}
-  \label{fig:fact-module-hierarchy}
-\end{figure}
-
-All inputs based on provenance variables (that is, the ones with ``region'' in
-their names from the previous terminology); \texttt{path\_belongs\_to\_var},
-\texttt{universal\_region}, \texttt{borrow\_region}, \texttt{var\_uses\_region},
-and \texttt{outlives}, are all generated using information obtained during
-MIR~type-checking. The rest of the inputs are generated either from walking the
-MIR directly (\texttt{invalidates}, \texttt{cfg\_edge}, and all the facts
-concerning variable uses and drops), or from intermediary indices generated from
-the MIR in earlier parts of the compilation process (all facts related to move
-paths, which are identified by previous compilation steps). All of this suggests
-that the design shown in Figure~\ref{fig:fact-module-hierarchy} should be
-refactored to reflect these data dependencies, unifying the generation of most
-facts into a common Polonius module higher up in the hierarchy, and leaving only
-the ones needing the transient and internal output from the type checker (i.e
-provenance variables and their relations to each other and to variables) under
-the \texttt{type\_check} submodule. This possible future design is discussed in
-more detail in Chapter~\ref{cha:conclusions}.
-
-Returning to one of the examples of the borrowing rules in
-Section~\ref{sec:borrowing-rules}, we can describe some of the facts that would
-be output on each line. An annotated example can be seen in
-Listing~\ref{lst:polonius-fact-emission}.
-
-\begin{sourcecode}
-  \captionof{listing}{A minimal example of a violated loan in Rust and the
-    Polonius input facts it would produce during
-    compilation.}\label{lst:polonius-fact-emission}
-\begin{minted}{rust}
-    let mut pt = Point(6, 9); // var_defined(pt)
-    let x = &mut pt;  // var_defined(x),
-                      // var_used(pt),
-                      // borrow_region('1, b0)
-                      // outlives('1, 'x)
-                      // var_uses_region(x, 'x)
-    let y = &mut pt;  // invalidates(b0)
-                      // ...
-
-   // we assume var_used(x), var_used(y) is emitted here.
-\end{minted}
-\end{sourcecode}
-
-In practice, this would happen at the MIR level, which would introduce
-intermediary variables. However, the core reasoning is the same: the right-hand
-side of the assignment is typed with a provenance variable \InRust{'1},
-containing only that loan. The assignment to \InRust{x} then sets up a subtyping
-relationship with the corresponding \InDatalog{outlives('1, 'x)} fact that
-propagates it to \InRust{x}'s provenance variable \InRust{'x}, ensuring it is
-considered live when the loan on the next line generates a fact
-\InRust{invalidates(b0)}, resulting in the eventual derivation of an
-\InRust{error}.
-
-\section{A Field Study of Polonius Inputs}\label{sec:field-study-borrow}
+\chapter{A Field Study of Polonius Inputs}\label{sec:field-study-borrow}
 
 We selected for analysis roughly 20 000~publicly available Rust packages
 (``crates'') from the most popular projects as defined by number of downloads
