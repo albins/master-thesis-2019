@@ -21,38 +21,25 @@
 
 \author{Albin Stjerna}
 \date{\today}
+% XeTeX specific packages and settings
+% Language, diacritics and hyphenation
+\usepackage[babelshorthands]{polyglossia}
+\usepackage{xunicode}
+\setmainlanguage{english}
+% \setotherlanguages{swedish}
 
-% Package to determine wether XeTeX is used
-\usepackage{ifxetex}
+% Font settings
+\setmainfont{Baskerville}
+% \setromanfont{Baskerville}
+\setsansfont{Helvetica Neue}
+% \setmonofont{Source Code Pro} % only minted!
 
-\ifxetex
-	% XeTeX specific packages and settings
-	% Language, diacritics and hyphenation
-        \usepackage[babelshorthands]{polyglossia}
-        \usepackage{xunicode}
-	\setmainlanguage{english}
-	%\setotherlanguages{swedish}
-
-	% Font settings
-	\setmainfont{Baskerville}
-  %\setromanfont{Baskerville}
-	\setsansfont{Helvetica Neue}
-	%\setmonofont{Source Code Pro} % only minted!
-\else
-	% Plain LaTeX specific packages and settings
-	% Language, diacritics and hyphenation
-    % Use English and Swedish languages.
-	\usepackage[british]{babel}
-
-	% Font settings
-	\usepackage{type1cm}
-	\usepackage[latin1]{inputenc}
-	\usepackage[T1]{fontenc}
-	\usepackage{mathptmx}
-
-	% Enable scaling of images on import
-	\usepackage{graphicx}
-\fi
+% Plain LaTeX specific packages and settings
+% Language, diacritics and hyphenation
+% Use English and Swedish languages.
+%\usepackage[british]{babel}
+% Enable scaling of images on import
+\usepackage{graphicx}
 
 \usepackage{listings}
 \usepackage{chngcntr}
@@ -128,19 +115,6 @@
 \newcommand{\InDatalog}[1]{\mintinline{prolog}{#1}}
 \newcommand{\expression}[1]{\boxed{#1}}
 
-\newcommand{\RustBlock}[3]{
-  \begin{sourcecode}
-    \captionof{listing}{#2}
-    \label{code:#1}
-\begin{minted}{rust}
-#3
-\end{minted}
-  \end{sourcecode}}
-
-% Uncomment to use a custom abstract dummy text
-%\abstractdummy{
-% }
-
 \usepackage{xparse}
 \usepackage{epigraph}
 \usepackage[normalem]{ulem}
@@ -151,7 +125,7 @@
 \NewDocumentCommand{\setargsaux}{mm}
 {\IfNoValueTF{#2}{#1} {#1\,\delimsize|\,\mathopen{}#2}}%{#1\:;\:#2}
 
-\newcommand{\ntyperule}[2]{\begin{array}{c}#1\\\hline\raisebox{1pt}{\strut}#2\end{array}}
+\newcommand{\ntyperule}[2]{\begin{array}{c}#1\\\midrule\raisebox{1pt}{\strut}#2\end{array}}
 \newcommand{\Loan}[0]{l}
 
 \newcommand{\goodexample}[1]{\colorbox{green}{#1}}
@@ -182,11 +156,6 @@
 \par}
 
 \begin{document}
-% Sync the counters:
-\counterwithin{listing}{section}
-\counterwithin{figure}{section}
-\counterwithin{table}{section}
-\counterwithin{equation}{section}
 
 % %\frontmatter*
 %     % Creates the front matter (title page(s), abstract, list of papers)
@@ -245,7 +214,7 @@ reference-analysis part of the borrow check.
 \section*{Acknowledgements}
 \epigraph{We seek not the knowledges ruled by phallogocentrism (nostalgia for
   the presence of the one true Word) and disembodied vision. We seek those ruled
-by partial sight and limited voice--not partiality for its own sake but, rather,
+by partial sight and limited voice---not partiality for its own sake but, rather,
 for the sake of the connections and unexpected openings situated knowledges make
 possible. Situated knowledges are about communities, not about isolated
 individuals. \textbf{The only way to find a larger vision is to be somewhere in
@@ -272,7 +241,7 @@ individuals. \textbf{The only way to find a larger vision is to be somewhere in
 
   At the time of writing Rust is very young. Despite this, it still has a
   surprisingly large and surprisingly nice fan base. The Rust Book notes that
-  ``...the Rust programming language is fundamentally about empowerment: no
+  ``\ldots{}the Rust programming language is fundamentally about empowerment: no
   matter what kind of code you are writing now, Rust empowers you to reach
   farther, to program with confidence in a wider variety of domains than you did
   before''~\cite{nichols_rust_nodate}. It is around this notion, that systems
@@ -416,7 +385,7 @@ or a \textit{borrow} in Rust parlance. Whenever a reference to a resource is
 created in Rust, its borrowing rules described in
 Chapter~\ref{cha:borrowing-rules} must be respected for as long as the reference
 is alive, including across function calls~\cite{nichols_rust_nodate}. These
-rules include memory lifetimes (i.e. the referenced memory must stay initialised
+rules include memory lifetimes (i.e.\ the referenced memory must stay initialised
 as long as there is a reference to it), and unique access for a write-reference;
 if there is an active write-reference to some part of memory, no other read- or
 -write references must exist simultaneously. This is the restriction that
@@ -506,7 +475,7 @@ and~\ref{cha:implementation}. We will also briefly explain how the formulation
 of the borrow check changes between NLL and Polonius
 (Section~\ref{sec:reference-provenance}). This section introduces the finer
 points of Polonius, and is worth reading even if you are uninterested in the
-difference between Polonius and NLL.
+difference between Polonius and NLL\@.
 
 Conceptually, the borrow check verifies that Rust's ownership rules of shared
 memory are respected. As mentioned in the previous section, memory is owned by
@@ -531,7 +500,7 @@ examples are taken directly or slightly modified from
 { \renewcommand{\arraystretch}{2.0}
 \begin{table}[!htbp]
 \begin{tabular}{p{0.18\textwidth} p{0.41\textwidth} p{0.41\textwidth}}
-  Rule & Positive Example & Negative Example \\ \hline
+  Rule & Positive Example & Negative Example \\ \toprule
   Use-Init & % Positive example:
   \begin{minipage}[t]{0.41\textwidth}
     \begin{minted}[escapeinside=||, autogobble]{rust}
@@ -661,8 +630,7 @@ let z = |\badexample{x.0}|;
   \goodexample{positive} (free from errors) and \badexample{negative}
   (with errors) examples. Highlighted code shows (parts of) expressions that
   would perform the borrow check, such as mutating, moving, or reading a
-  variable. Green highlights show accepted uses and red ones show failed ones.}
-  \label{tab:borrow-check}
+  variable. Green highlights show accepted uses and red ones show failed ones.}\label{tab:borrow-check}
 \end{table}%
 }
 
@@ -785,8 +753,8 @@ implication that any of the loans in $r$ might be dereferenced at control-flow
 points reachable from $p$, and thus that the terms of the loans in $r$ must be
 respected at that point. The possibility of a future access is not limited to
 direct access of a variable and is further discussed in
-Section~\ref{sec:deall-as-spec}. This leads us back to our motivating example of Listing~\ref
-{lst:motivating-example} again, where Polonius would conclude that
+Section~\ref{sec:deall-as-spec}. This leads us back to our motivating example of
+Listing~\ref{lst:motivating-example} again, where Polonius would conclude that
 \InRust{event} is being reassigned before use at the call to \InRust{parse()},
 meaning that there would be no two overlapping live write-loans to the buffer,
 and therefore no error. The details of how this deduction is done is what will
@@ -800,7 +768,7 @@ ongoing work of \citeauthor*{weiss_oxide:_2019} on formalising the reference
 ownership rules of Rust into the formally defined type system
 Oxide~\cite{weiss_oxide:_2019}. Oxide is notable in that it shares Polonius' use
 of provenance variables, as introduced in
-Section~\ref{sec:reference-provenance}, in contrast to NLL. The rules presented
+Section~\ref{sec:reference-provenance}, in contrast to~NLL\@. The rules presented
 here are based on the 2019 draft version of the paper and will change
 substantially for its final version.
 
@@ -836,7 +804,7 @@ Section~\ref{sec:borrow-check-intuition}. The only thing you need to remember is
 that assignments give rise to subset constraints that, as it were, ``infects''
 provenance variables with loans from other provenance variables.
 
-\decoline
+\decoline{}
 
 Most of the conventions used in the Oxide formulation can be glossed over for
 the purposes of our understanding, but the most important ones are the type
@@ -857,7 +825,7 @@ being moved could instead be copied, and two copies be maintained.
 
 Judgments on the form~$\Gamma \vdash_{\omega} \pi \: : \: \tau$ mean that ``in
 the environment~$\Gamma$, it is safe to use the variable~$\pi$ (of type~$\tau$)
-$\omega$-ly'' \cite{weiss_oxide:_2019}. In other words, if $\omega$~is
+$\omega$-ly''~\cite{weiss_oxide:_2019}. In other words, if $\omega$~is
 \emph{unique}, it means that there are no live loans of any paths
 overlapping~$\pi$, and of $\omega$~is \emph{shared} that there are no
 overlapping loans in the provenance part of $\tau$. The full type system handles
@@ -1043,8 +1011,7 @@ fact, which is the major source of constraints on loans.
     to find the potentially live loans at every given program point. These
     potential loans are used together with their potential violations to derive
     actual errors. A more precise representation can be found in
-    Figure~\ref{fig:polonius-overview}.}
-  \label{fig:polonius-high-level-overview}
+    Figure~\ref{fig:polonius-overview}.}\label{fig:polonius-high-level-overview}
 \end{figure}
 
 We now imagine this typing rule yielding these subtyping constraints for every
@@ -1104,8 +1071,7 @@ interaction between Polonius and the Rust compiler in the following chapter.
   \includegraphics[width=0.9\linewidth]{Graphs/rustc-overview}
   \caption[The Rust Compilation Process]{An overview of the Borrow Check's place
     in the process of compiling Rust code, as described in the Rust Developer's
-    Guide~\cite{rustc_developers_guide_nodate}.}
-  \label{fig:rustc-overview}
+    Guide~\cite{rustc_developers_guide_nodate}.}\label{fig:rustc-overview}
 \end{figure}
 
 The logic of the borrow check as described in Chapter~\ref{cha:borrowing-rules}
@@ -1156,8 +1122,7 @@ fn main() {
   successful return block,~6, contains a number of stack deallocation hints for
   later compilation steps, and sets up the return value of \InRust{main()},
   \InRust{_0} to be the empty tuple (corresponding to \texttt{void} in a
-  C~program).}
-  \label{fig:mir-example}
+  C~program).}\label{fig:mir-example}
 \end{figure}
 
 The MIR consists of basic blocks in the traditional compilers sense, each
@@ -1185,27 +1150,26 @@ used in Polonius can be found in Table~\ref{tab:input-atoms}.
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
   \begin{tabular}{@{}l l m{7cm}}
-    Atom & Example & Description \\ \hline
-    Loan\notmine & \InRust{&x} & An individual borrow expression. \\
-    Provenance variable\notmine & \InRust{'a} & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine & \InRust{Mid(bb1[5])} & A point in the control-flow graph. \\
+    Atom & Example & Description \\ \toprule
+    Loan\notmine{} & \InRust{&x} & An individual borrow expression. \\
+    Provenance variable\notmine{} & \InRust{'a} & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine{} & \InRust{Mid(bb1[5])} & A point in the control-flow graph. \\
     Move path & \InRust{x.y.z} & A precise field that can be accessed into a variable; a field in a struct or a projection in a tuple. \\
     Variable & \InRust{x} & A MIR (or Rust) variable. \\
   \end{tabular}
 \caption[Polonius Atoms]{The atoms used in Polonius. Variables and move paths
-  were introduced as part of this thesis.}
-  \label{tab:input-atoms}
+  were introduced as part of this thesis.}\label{tab:input-atoms}
 \end{table}%
 }
 
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
 \begin{tabular}{@{}l l@{} l@{} @{}l@{}}
-  Fact & Code Example & Resulting Tuple(s) & Used \\ \hline
-  \InDatalog{borrow_region(R, L, P)}\notmine & \InRust{bb0[0]}: \InRust{_1 = &1;}&
+  Fact & Code Example & Resulting Tuple(s) & Used \\ \toprule
+  \InDatalog{borrow_region(R, L, P)}\notmine{} & \InRust{bb0[0]}: \InRust{_1 = &1;}&
                                                                            \InRust{('a, &1, Mid(bb0[0]))} & Bck  \\
-  \InDatalog{universal_region(R)}\notmine & \InRust{fn f<'b>(x: &'b str)} & \InRust{('b)} & Bck \\
-  \InDatalog{cfg_edge(P, Q)}\notmine &
+  \InDatalog{universal_region(R)}\notmine{} & \InRust{fn f<'b>(x: &'b str)} & \InRust{('b)} & Bck \\
+  \InDatalog{cfg_edge(P, Q)}\notmine{} &
                                \begin{tabular}[t]{@{}l l@{}}
                                  \InRust{bb0[0]}: & \InRust{_1 = 1;} \\
                                  \InRust{bb0[1]}: & \InRust{_2 = 3;}
@@ -1217,7 +1181,7 @@ used in Polonius can be found in Table~\ref{tab:input-atoms}.
                         \InRust{(Start(bb0[1]), Mid(bb0[1]))}\\
                         \end{tabular}
                         & All \\
-  \InDatalog{killed(L, P)}\notmine &
+  \InDatalog{killed(L, P)}\notmine{} &
                              \begin{tabular}[t]{@{}l l@{}}
                                \InRust{bb0[0]}: &\InRust{_3 = &_1;} \\
                                \InRust{bb0[1]}: &\InRust{_3 = &_2;}
@@ -1225,10 +1189,10 @@ used in Polonius can be found in Table~\ref{tab:input-atoms}.
                       &
                         \InRust{(&_1, Mid(bb0[1]))}
                                            & Bck \\
-  \InDatalog{outlives(R1, R2, P)}\notmine &
+  \InDatalog{outlives(R1, R2, P)}\notmine{} &
                                     \InRust{bb0[0]}: \InRust{p: &'p i32 = &'x x;}
                                      & \InRust{('x, 'p, Mid(bb0[0]))} & Bck \\
-  \InDatalog{invalidates(P, L)}\notmine &
+  \InDatalog{invalidates(P, L)}\notmine{} &
                                   \begin{tabular}[t]{@{}l l@{}}
                                     \InRust{bb0[0]}: & \InRust{_2 = &_1;} \\
                                     \InRust{bb0[1]}: & \InRust{_1 = 3;}
@@ -1265,8 +1229,7 @@ used in Polonius can be found in Table~\ref{tab:input-atoms}.
 \caption[Input Facts to Polonius]{Polonius input facts, with minimal code
   examples. All facts except \texttt{invalidates}, \texttt{cfg\_edge},
   \texttt{killed}, \texttt{borrow\_region}, \texttt{outlives}, and
-  \texttt{universal\_region} were added as part of the work on this thesis.}
-  \label{tab:input-facts}
+  \texttt{universal\_region} were added as part of the work on this thesis.}\label{tab:input-facts}
 \end{table}%
 }
 
@@ -1286,8 +1249,7 @@ other words, it is not a full replacement of the current implementation.
   \caption[Polonius In Rust's Module Hierarchy]{An illustration of where in the
     module hierarchy of the Rust compiler the various facts are emitted.
     Underscores are replaced with white space for readability. Blue boxes
-    represent facts, and black boxes (sub-)modules.}
-  \label{fig:fact-module-hierarchy}
+    represent facts, and black boxes (sub-)modules.}\label{fig:fact-module-hierarchy}
 \end{figure}
 
 All inputs based on provenance variables (that is, the ones with ``region'' in
@@ -1349,7 +1311,7 @@ Chapter~\ref{cha:implementation}.
   Were nothing but to waste night, day, and time;\\
   Therefore, since brevity is the soul of wit,\\
   And tediousness the limbs and outward flourishes,\\
-  I will be brief. ...}{Polonius, illustrating the succinctness and clarity of
+  I will be brief.}{Polonius, illustrating the succinctness and clarity of
   Datafrog compared to Datafrog, in \textit{Hamlet}, Act-II, Scene-II}
 
 In this chapter, we will discuss Datalog, the language we use to express
@@ -1456,7 +1418,7 @@ region_live_at_var.from_join(
 \end{sourcecode}
 
 Joins in Datafrog are done using one of two methods on the variable that is to
-be populated (e.g. in Listing~\ref{lst:datafrog:region-live-at}
+be populated (e.g.\ in Listing~\ref{lst:datafrog:region-live-at}
 \InRust{region_live_at_var}), a variable with tuples of the format \InRust{(Key,
   Val1)}. The first method, \InRust{from_join}, performs simple joins from
 variables or relations into the (possibly different) target variable. Its
@@ -1493,7 +1455,7 @@ tuples matching \InRust{Key} are discarded.
 
 In Listing~\ref{lst:datafrog:var-live}, we can see a leapjoin populating
 \InRust{var_use_live_var} with tuples produced by joining the \InRust{Relation}s
-representing \InRust{var_defined_rel} and the reversed CFG.
+representing \InRust{var_defined_rel} and the reversed CFG\@.
 
 \section{Datalog: a Natural Choice for Polonius}\label{sec:why-datalog}
 
@@ -1577,8 +1539,7 @@ sound).
     Blue boxes represent facts and relations implemented during the work on this
     thesis. Relations are shown using boldface, and facts in regular font. The
     historical term ``region'' is used here instead of provenance variables to
-    match the convention used in the actual code.}
-  \label{fig:polonius-overview}
+    match the convention used in the actual code.}\label{fig:polonius-overview}
 \end{figure}
 
 In all of these sections, we will introduce every non-trivial rule with a
@@ -1624,7 +1585,7 @@ Liveness of \emph{variables} is computed in order to determine the liveness of
 \emph{provenance variables}. Intuitively, a variable (provenance or regular
 alike) is live when it may be used at some later point in the program. We say
 that a provenance variable is \textit{use-live} if it is live on account of
-being used (e.g. dereferenced). This is important, because if a provenance
+being used (e.g.\ dereferenced). This is important, because if a provenance
 variable is dead, violating its loans is not an issue.
 
 A summary of the facts, intermediate relations, and outputs of Polonius'
@@ -1633,11 +1594,11 @@ liveness computations can be found in Table~\ref{tab:liveness-facts-recap}.
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
   \begin{tabular}{@{}l l m{5.5cm}}
-    Atom/Fact & Type & Description \\ \hline
-    Provenance\notmine & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine & Atom & A point in the control-flow graph. \\
+    Atom/Fact & Type & Description \\ \toprule
+    Provenance\notmine{} & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine{} & Atom & A point in the control-flow graph. \\
     Variable & Atom & A MIR (or Rust) variable. \\
-    \InDatalog{cfg_edge(P, Q)}\notmine & Fact & A transition in the CFG. \\
+    \InDatalog{cfg_edge(P, Q)}\notmine{} & Fact & A transition in the CFG\@. \\
     \InDatalog{var_used(Var, Point)} & Fact & A regular variable use happens here.\\
     \InDatalog{var_defined(Var, Point)} & Fact & A variable is assigned here.\\
     \InDatalog{var_uses_region(Var, Provenance)} & Fact & Connects provenance variables from types to their variables.\\
@@ -1647,8 +1608,7 @@ liveness computations can be found in Table~\ref{tab:liveness-facts-recap}.
     \InDatalog{var_use_live(Var, Point)} & Intermediate & This variable is used in an expression. \\
     \InDatalog{region_live_at(Provenance, Point)} & Output & This provenance variable is live at this point, and the conditions of its loan must be accepted. \\
   \end{tabular}
-\caption[Liveness Dramatis Personae]{Liveness Dramatis Personae.}
-  \label{tab:liveness-facts-recap}
+\caption[Liveness Dramatis Personae]{Liveness Dramatis Personae.}\label{tab:liveness-facts-recap}
 \end{table}%
 }
 
@@ -1661,12 +1621,11 @@ liveness computations can be found in Table~\ref{tab:liveness-facts-recap}.
     skull and crossbones symbolising \InDatalog{var_defined(V, _)}). Variables
     are named by prefixing underscores, and edges annotated with the propagated
     live variable and its liveness type(s) (\textbf{D}rop or \textbf{U}se). The
-    source code is one of the test cases for drop-liveness.}
-  \label{fig:liveness-graph}
+    source code is one of the test cases for drop-liveness.}\label{fig:liveness-graph}
 \end{figure}
 
 The use-liveness of a variable (Figure~\ref{fig:var-use-live}) is computed as a
-transitive closure backwards across the CFG. A variable is use-live where it is
+transitive closure backwards across the CFG\@. A variable is use-live where it is
 being used, and stays use-live (backwards) until it is defined. Specifically,
 the rule is as follows: if a variable~$v$ is live in some point~$q$ and~$q$ is
 reachable from $p$ in the control-flow graph, then~$v$ is live in~$p$ too unless
@@ -1692,7 +1651,7 @@ var_use_live(V, P) :-
 { \renewcommand{\arraystretch}{1.5}
     \begin{tabular}{@{}l l}
       $\top$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_used(x, Start(bb0[1]))}\\
                      \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}
@@ -1705,7 +1664,7 @@ var_use_live(V, P) :-
                        
                  \end{tabular}\\
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_use_live(x, Start(bb0[1]))}\\
                      \InRust{var_defined(x, Mid(bb0[0]))}\\
@@ -1727,8 +1686,7 @@ we care about the provenances in their types. And it turns out that there is
 another way in which a reference may be live, which is by being used during the
 deallocation of a data structure.
 
-\subsection{Deallocation As a Special Case of Variable Use}
-\label{sec:deall-as-spec}
+\subsection{Deallocation As a Special Case of Variable Use}\label{sec:deall-as-spec}
 When Rust's variables go out of scope, they are implicitly deallocated, or
 dropped in Rust parlance. Explicit deallocation is also possible by calling the
 function \InRust{drop()}, which takes ownership of a variable (that is,
@@ -1799,8 +1757,7 @@ fn main() {
   \InRust{drop(_6)}; as \InRust{DefaultDrop}, the \InRust{struct} stored in
   \InRust{_6}, uses the default deallocator and contains only a reference,
   deallocating it is a no-op. Some irrelevant details, such as hints about stack
-  allocations and deallocations of intermediate variables, have been pruned.}
-  \label{fig:drop-liveness}
+  allocations and deallocations of intermediate variables, have been pruned.}\label{fig:drop-liveness}
 \end{figure}
 
 Following the MIR translation of Listing~\ref{lst:drop-liveness} in
@@ -1846,13 +1803,13 @@ var_drop_live(V, P) :-
 { \renewcommand{\arraystretch}{1.5}
     \begin{tabular}{@{}l l}
       $\top$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_drop_used(x, Start(bb0[1]))}\\
                      \InRust{var_maybe_initialized_on_exit(x, Mid(bb0[0]))}\\
                      \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
                    \end{tabular} &%
-                                   \InRust{var_drop_live(x, Start(bb0[1]))} \\ \hline
+                                   \InRust{var_drop_live(x, Start(bb0[1]))} \\ \toprule
                                    % End first positive example
                    \begin{tabular}[t]{@{}l}
                    \InRust{var_drop_live(x, Start(bb0[1]))}\\
@@ -1864,7 +1821,7 @@ var_drop_live(V, P) :-
                  \end{tabular}\\% End positive examples
                    
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_drop_live(x, Start(bb0[1]))}\\
                      \InRust{var_defined(x, Mid(bb0[0]))}\\
@@ -1911,17 +1868,17 @@ region_live_at(R, P) :-
 { \renewcommand{\arraystretch}{1.5}
     \begin{tabular}{@{}l l}
       $\top$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_drop_live(x, Mid(bb0[1]))}\\
                      \InRust{var_drops_region(x, 'nested)}
                    \end{tabular} &%
-                                   \InRust{region_live_at('nested, Mid(bb0[1])}\\ \hline
+                                   \InRust{region_live_at('nested, Mid(bb0[1]))}\\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_use_live(x, Mid(bb0[1]))}\\
                      \InRust{var_uses_region(x, 'x)}
                    \end{tabular} &%
-                                   \InRust{region_live_at('x, Mid(bb0[1])}\\
+                                   \InRust{region_live_at('x, Mid(bb0[1]))}\\
                  \end{tabular}\\
     \end{tabular}    
   }
@@ -1936,7 +1893,7 @@ region_live_at(R, P) :-
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
 \begin{tabular}{@{}l l l l}
-  Statement & Use-live & Drop-live & Provenance(s) live \\ \hline
+  Statement & Use-live & Drop-live & Provenance(s) live \\ \toprule
   \InRust{let mut x = 13;} \\
   \InRust{let own = OwnDrop { data: &'x1 x };} & \InRust{x} & &  \\
   \InRust{let bad_ref = &'x2 mut x;} & \InRust{x} & \InRust{own} & \InRust{'x1}  \\
@@ -1946,8 +1903,7 @@ region_live_at(R, P) :-
 \caption[Liveness Example]{An example of a drop-live \InRust{struct} causing an
   inner provenance variable to be live. This program would generate an error, as
   we have two overlapping loans of the same path (\InRust{x}), where one is
-  mutable.}
-  \label{tab:liveness-example}
+  mutable.}\label{tab:liveness-example}
 \end{table}%
  }
 
@@ -1956,12 +1912,12 @@ region_live_at(R, P) :-
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
   \begin{tabular}{@{}l l m{5.5cm}}
-    Atom/Fact & Type & Description \\ \hline
-    Provenance\notmine & A & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine & A & A point in the control-flow graph. \\
+    Atom/Fact & Type & Description \\ \toprule
+    Provenance\notmine{} & A & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine{} & A & A point in the control-flow graph. \\
     Variable & A & A MIR (or Rust) variable. \\
     Path & A & A move path. \\
-    \InDatalog{cfg_edge(P, Q)}\notmine & F & A transition in the CFG. \\
+    \InDatalog{cfg_edge(P, Q)}\notmine{} & F & A transition in the CFG\@. \\
     \InDatalog{child(Path2, Path1)} & F & \InDatalog{Path1} is a prefix of-, and not equal to \InDatalog{Path2}  \\
     \InDatalog{initialized_at(Path, P)} & F, I & This path was given a value here. \\
     \InDatalog{path_belongs_to_var(Path, V)} & F & This path is the root path of variable $V$. \\
@@ -1974,8 +1930,7 @@ region_live_at(R, P) :-
     \InDatalog{var_maybe_init___(Var, Point)} & O & This variable is initialised along at least one branch reaching this node at the time of its exit. \\
     \InDatalog{move_error(Path, Point)} & O & Error: \InDatalog{Path} is accessed here, but may have been moved, or was never initialised. \\
   \end{tabular}
-\caption{Move Analysis Dramatis Personae}
-  \label{tab:move-facts-recap}
+\caption{Move Analysis Dramatis Personae}\label{tab:move-facts-recap}
 \end{table}%
 }
 
@@ -2098,7 +2053,7 @@ var_maybe_initialized_on_exit(Var, P) :-
 { \renewcommand{\arraystretch}{1.5}
     \begin{tabular}{@{}l l}
       $\top$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{initialized_at(x, Mid(bb0[0]))}\\
                      \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
@@ -2112,7 +2067,7 @@ var_maybe_initialized_on_exit(Var, P) :-
                        
                  \end{tabular}\\
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{path_maybe_initialized_on_exit(x, Start(bb0[0]))}\\
                      \InRust{moved_out_at(x, Mid(bb0[0]))}\\
@@ -2152,8 +2107,8 @@ the set of possibly initialised paths at that point (computed in the previous
 section), minus the set of possibly \textit{moved} paths, computed analogously
 to the over-approximated set of initialised ones.
 
-These relations are computed in Listings~\ref{lst:move-error} (move errors),
-\ref{lst:path-definitely-initialised} (provably initialised paths),
+These relations are computed in Listings~\ref{lst:move-error} (move
+errors),~\ref{lst:path-definitely-initialised} (provably initialised paths),
 and~\ref{lst:path-maybe-moved} (possibly deinitialised paths).
 
 \begin{sourcecode}
@@ -2209,7 +2164,7 @@ path_maybe_moved_on_exit(Path, Point2) :-
 { \renewcommand{\arraystretch}{1.0}
   \begin{table}[!htbp]    
 \begin{tabular}{@{}l l l l}
-  Statement                & Maybe init                 & Definitely init            & Accessed \\ \hline
+  Statement                & Maybe init                 & Definitely init            & Accessed \\ \toprule
   \InRust{let x = (2, 3)} & \InRust{x.0}, \InRust{x.1}, \InRust{x} & \InRust{x.0}, \InRust{x.1}, \InRust{x} & \\
   \InRust{move x.0}        & \InRust{x.1}, \InRust{x}               & \InRust{x.1}, \InRust{x} & \InRust{x.0} \\ % a move
   \InRust{x.1 + 7}         & \InRust{x.1}, \InRust{x}               & \InRust{x.1}, \InRust{x} & \InRust{x.1} \\ % a legal access to partially deinitialised
@@ -2227,8 +2182,7 @@ path_maybe_moved_on_exit(Path, Point2) :-
   the remaining path, an erroneous access to the moved path, a reinitialisation
   of the moved path, an \InRust{if}~statement triggering imprecision, and
   finally an erroneous use of a potentially partially moved variable
-  (\InRust{x.0}).}
-  \label{tab:move-example}
+  (\InRust{x.0}).}\label{tab:move-example}
 \end{table}%
  }
 
@@ -2237,35 +2191,35 @@ path_maybe_moved_on_exit(Path, Point2) :-
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
   \begin{tabular}{@{}l l m{5.5cm}}
-    Atom/Fact & Type & Description \\ \hline
-    Provenance\notmine & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine & Atom & A point in the control-flow graph. \\
-    Loan\notmine & Atom & A unique borrow expression (\InRust{&x}). \\
-    \InDatalog{cfg_edge(P, Q)}\notmine & Fact & A transition in the CFG. \\
+    Atom/Fact & Type & Description \\ \toprule
+    Provenance\notmine{} & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine{} & Atom & A point in the control-flow graph. \\
+    Loan\notmine{} & Atom & A unique borrow expression (\InRust{&x}). \\
+    \InDatalog{cfg_edge(P, Q)}\notmine{} & Fact & A transition in the CFG\@. \\
     \InDatalog{region_live_at(Provenance, Point)} & Fact & This provenance variable is live at this point, and the conditions of its loan must be accepted. \\
-    \InDatalog{borrow_region(Provenance, Loan, Point)}\notmine & Fact & A borrow expression at this point creates this loan and this provenance variable. \\
-    \InDatalog{invalidates(Point, Loan)}\notmine & Fact & An operation at this point would violate this loan if it were live. \\
-    \InDatalog{subset(Provenance1, Provenance2)}\notmine & Intermediate & There is a subset relationship between two provenances at this point. \\
-    \InDatalog{requires(Provenance, Loan, Point)}\notmine & Intermediate & This provenance contains this loan at this point. \\
-    \InDatalog{loan_live_at(Loan, Point)}\notmine & Intermediate & This loan is live at this point. \\
-    \InDatalog{error(Point)}\notmine & Output & A borrow check error (a violated loan) occurred at this point. \\
+    \InDatalog{borrow_region(Provenance, Loan, Point)}\notmine{} & Fact & A borrow expression at this point creates this loan and this provenance variable. \\
+    \InDatalog{invalidates(Point, Loan)}\notmine{} & Fact & An operation at this point would violate this loan if it were live. \\
+    \InDatalog{subset(Provenance1, Provenance2)}\notmine{} & Intermediate & There is a subset relationship between two provenances at this point. \\
+    \InDatalog{requires(Provenance, Loan, Point)}\notmine{} & Intermediate & This provenance contains this loan at this point. \\
+    \InDatalog{loan_live_at(Loan, Point)}\notmine{} & Intermediate & This loan is live at this point. \\
+    \InDatalog{error(Point)}\notmine{} & Output & A borrow check error (a violated loan) occurred at this point. \\
     
   \end{tabular}
-\caption{Loan Constraint Propagation Dramatis Personae}
-  \label{tab:polonius-facts-recap}
+\caption{Loan Constraint Propagation Dramatis Personae}\label{tab:polonius-facts-recap}
 \end{table}%
+}
 
 { \renewcommand{\arraystretch}{1.0}
   \begin{table}[!htbp]    
 \begin{tabular}{@{}l l l l l}
-  Statement & Killed & Invalidates & New Constraints & Live provenances \\ \hline
+  Statement & Killed & Invalidates & New Constraints & Live provenances \\ \toprule
   \InRust{let p: &'p i32 = &'1 x} & & &  \InRust{'1} $\subseteq$ \InRust{'p}, \InRust{&'1 x} $\in$ \InRust{'1} &  \\
   \InRust{let q: &'q i32 = &'2 x} & & & \InRust{'2} $\subseteq$ \InRust{'q}, \InRust{&'2 x} $\in$ \InRust{'2} & \InRust{'p} \\
   \InRust{let r: &'r i32} & & &  & \InRust{'p} \\
   \InRust{q = &'3 y} & \InRust{&'2 x} & & \InRust{'3} $\subseteq$ \InRust{'q}, \InRust{&'3 x} $\in$ \InRust{'3} & \InRust{'p, 'q, 'r} \\
-  \InRust{r=if f(){&'4 x}else{&'5 y}} & & & \InRust{'4},  \InRust{'5} $\subseteq$ \InRust{'q}, \InRust{&'4 x} $\in ...$ & \InRust{'p, 'q, 'r} \\
-  \InRust{x += 1} & & \InRust{&'1 x}, ... , \InRust{&'4 x} && \InRust{'p, 'q, 'r} \\
-  \InRust{use(p, q, r)} & & & & \InRust{'p, 'q, 'r} \\
+  \InRust{r=if f(){&'4 x}else{&'5 y}} & & & \InRust{'4},  \InRust{'5} $\subseteq$ \InRust{'q}, \InRust{&'4 x} $\in \ldots$ & \InRust{'p, 'q, 'r} \\
+  \InRust{x += 1} & & \InRust{&'1 x}, \ldots , \InRust{&'4 x} && \InRust{'p, 'q, 'r} \\
+  \InRust{use(p, q, r)} & & & & \InRust{'p, 'q, 'r}
 \end{tabular}
 \caption[Loan Constraint Propagation Example]{An example of the set membership
   constraints seen by Polonius during type-checking. Only two of the three
@@ -2275,8 +2229,7 @@ path_maybe_moved_on_exit(Path, Point2) :-
   \Set{\text{\InRust{&'1 x}}}$, \InRust{'q} $= \Set{\text{\InRust{&'3 y}}}$,
   \InRust{'r} $= \Set{\text{\InRust{&'4 x}, \InRust{&'5 y}}}$,
   resulting in only one two errors.< Additionally, note that the imprecision
-  introduced by the \InRust{if}~statement leads to dual subset constraints.}
-  \label{tab:borrowck-example}
+  introduced by the \InRust{if}~statement leads to dual subset constraints.}\label{tab:borrowck-example}
 \end{table}%
 }
 
@@ -2319,7 +2272,7 @@ subset(R1, R3, P) :-
 { \renewcommand{\arraystretch}{1.5}
     \begin{tabular}{@{}l l}
       $\top$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{subset('a, 'b, Mid(bb0[1]))}\\
                      \InRust{subset('b, 'c, Mid(bb0[1]))}
@@ -2327,7 +2280,7 @@ subset(R1, R3, P) :-
                                    \InRust{subset('a, 'c, Mid(bb0[1]))}
                  \end{tabular}\\
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{subset('a, 'b, Mid(bb0[1]))}\\
                      \InRust{subset('a, 'c, Mid(bb0[1]))}
@@ -2365,7 +2318,7 @@ subset(R1, R2, Q) :-
 { \renewcommand{\arraystretch}{1.5}
     \begin{tabular}{@{}l l}
       $\top$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{subset('a, 'b, Mid(bb0[1]))}\\
                      \InRust{cfg_edge(Mid(bb0[1]), Start(bb0[2]))}\\
@@ -2375,7 +2328,7 @@ subset(R1, R2, Q) :-
                                    \InRust{subset('a, 'b, Start(bb0[2]))}
                  \end{tabular}\\
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{subset('a, 'b, Mid(bb0[1]))}\\
                      \InRust{cfg_edge(Mid(bb0[1]), Start(bb0[2]))}\\
@@ -2423,7 +2376,7 @@ requires(R2, L, P) :-
 \end{sourcecode}
 
 Finally, Polonius performs the flow-sensitive propagation of these membership
-constraints across edges in the CFG. This is done using the rule in
+constraints across edges in the CFG\@. This is done using the rule in
 Figure~\ref{fig:requires-edge}, where the requirements propagate across
 CFG~edges for every loan~$L$ as long as the reference corresponding to~$L$ is
 not overwritten (\InDatalog{killed(L, _)}), and only for provenance variables that are
@@ -2444,7 +2397,7 @@ requires(R, L, Q) :-
 { \renewcommand{\arraystretch}{1.5}
     \begin{tabular}{@{}l l}
       $\top$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{requires('a, &x, Start(bb0[0]))}\\
                      \InRust{region_live_at('a, Mid(bb0[0]))}\\
@@ -2456,14 +2409,14 @@ requires(R, L, Q) :-
                        
                  \end{tabular}\\
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
-                   Input & Conclusion \\ \hline
+                   Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{requires('a, &x, Start(bb0[0]))}\\
                      \InRust{killed(&x, Start(bb0[0]))} \\
                      \InRust{region_live_at('a, Mid(bb0[0]))}\\
                      \InRust{cfg_edge(Start(bb0[0]), Mid(bb0[0]))}
                    \end{tabular} &%
-                                   (nothing; the loan was killed)\\ \hline
+                                   (nothing; the loan was killed)\\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{requires('a, &x, Start(bb0[0]))}\\
                      \InRust{region_live_at('a, Mid(bb0[0]))} $= \bot$\\
@@ -2484,10 +2437,10 @@ provenance variable can contain which loan (and therefore which path each
 reference may have been borrowed from). All that is left is translating this
 information into errors.
 
-\subsubsection{Detecting Loan Violations}
+\subsection{Detecting Loan Violations}
 
 The compiler produces a set of points in the CFG where a loan could possibly be
-violated (e.g. by producing a reference to a value that already has a unique
+violated (e.g.\ by producing a reference to a value that already has a unique
 reference) in \InDatalog{invalidates(P, L)}. All that remains for Polonius is to
 figure out which loans are live where (Listing~\ref{lst:loan-live}), and
 determine if any of those points intersect with an invalidation of that loan
@@ -2519,8 +2472,7 @@ In addition to polish, comprehensive benchmarking, and performance
 optimisations, all discussed later, there are three important features missing
 in Polonius before it reaches parity with NLL, the current borrow checker.
 
-\subsection{Detecting Access to Deinitialised Paths}
-\label{sec:missing-features:move}
+\subsection{Detecting Access to Deinitialised Paths}\label{sec:missing-features:move}
 
 Most of the work required to support the full move initialisation is described
 in Section~\ref{sec:move-errors}. However, this code is untested, not integrated
@@ -2528,8 +2480,7 @@ into Polonius' error reporting, and lacks support for some edge cases. This
 feature also depends on the design of an interface for Polonius to report these
 errors back to Rust, and such an interface has not yet been agreed upon.
 
-\subsection{Illegal Subset Relations}
-\label{sec:missing-features:illegal-subset-relations}
+\subsection{Illegal Subset Relations}\label{sec:missing-features:illegal-subset-relations}
 
 Polonius currently does not verify that a subset relationship it finds between
 provenance variables is actually valid in itself. For example, this unsound code
@@ -2552,8 +2503,7 @@ of provenance variables \InRust{'x, 'y}, which it certainly does
 not~\cite{matsakis_polonius_2019-1}. This feature also depends on the design of
 an extended interface for reporting errors from Polonius to the Rust compiler.
 
-\subsection{Analysis of Higher Kinds}
-\label{sec:missing-features:higher-kinds}
+\subsection{Analysis of Higher Kinds}\label{sec:missing-features:higher-kinds}
 
 The final missing functionality in Polonius is interaction with higher-ranked
 (generic, etc) subtyping arising from generic functions or trait-matching. The
@@ -2565,8 +2515,7 @@ solve~\cite{matsakis_polonius_2019}. The current plan is to use the already
 existing infrastructure in Rust for this, but at the time of writing work on
 this has not even reached the planning stage.
 
-\subsection{Addressing a Provenance Variable Imprecision Bug}
-\label{sec:missing-features:provenance-variable-equality}
+\subsection{Addressing a Provenance Variable Imprecision Bug}\label{sec:missing-features:provenance-variable-equality}
 
 During the work for this thesis, a shortcoming in both Polonius and (probably)
 \citeauthor*{weiss_oxide:_2019}'s Oxide, discussed in
@@ -2739,8 +2688,7 @@ in too many outliers for the plots to be readable.
   \caption[Runtimes Per Function for Three Polonius Variants]{A box plot
     showing the distribution of runtimes per function for three
     implementations of Polonius. As can be seen here, the vast majority execute
-    very quickly.}
-  \label{fig:solvetimes}
+    very quickly.}\label{fig:solvetimes}
 \end{figure}
 
 
@@ -2749,11 +2697,10 @@ in too many outliers for the plots to be readable.
   \caption[Runtimes Per Function for Two Polonius Variants on Longer-Running
   Inputs]{A box plot showing the distribution of runtimes per function for the
     two optimised Polonius implementations on just functions that executed in
-    between 1--50s on \textsc{Naive}.}
-  \label{fig:solvetimes-long}
+    between 1--50s on \textsc{Naive}.}\label{fig:solvetimes-long}
 \end{figure}
 
-\subsection{Performance}\label{sec:inputs:performance}
+\section{Performance}\label{sec:inputs:performance}
 
 In general, all three algorithms finished quickly for almost all functions, with
 both of the optimised algorithms already showing improvements in runtimes, as
@@ -2770,19 +2717,17 @@ implementation even when excluding smaller inputs~\ref{fig:solvetimes-long}.
 \begin{figure}
   \includegraphics[width=0.5\linewidth]{Graphs/solvetimes_repo_gmean.pdf}
   \caption[Geometric Means of Runtimes Per Repository]{Geometric means of the
-    runtimes per repositoriy and implementation.}
-  \label{fig:solvetimes-gmean-repo}
+    runtimes per repositoriy and implementation.}\label{fig:solvetimes-gmean-repo}
 \end{figure}
 
 
-\subsection{Characteristics of Real-World Polonius Input
+\section{Characteristics of Real-World Polonius Input
   Data}\label{sec:inputs:inputs}
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/input_sizes_boxplot.pdf}
   \caption[Distribution of Polonius Input Tuple Sizes]{A box plot showing the
-    distribution of the various input sizes.}
-  \label{fig:input-sizes}
+    distribution of the various input sizes.}\label{fig:input-sizes}
 \end{figure}
 
 \begin{figure}
@@ -2822,15 +2767,14 @@ results were unusable as the inputs had no visually discernible patterns in
 neither 2 nor 3 dimensions, suggesting that most inputs are in some sense
 typical, or that PCA is ineffective here.
 
-\subsection{How Inputs Affect Runtime}\label{sec:inputs:correlation}
+\section{How Inputs Affect Runtime}\label{sec:inputs:correlation}
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/corr_heatmap.pdf}
   \caption[Heatmap of Input Sizes Affecting Runtime]{Heatmap of
     Pearson~correlations between various input size metrics and runtimes for
     all three Polonius implementations, suggesting in particular that variable
     uses, number of variables, and the number of provenance variables heavily
-    affect runtime.}
-  \label{fig:corr-heatmap}
+    affect runtime.}\label{fig:corr-heatmap}
 \end{figure}
 A heatmap of the (Pearson) correlation between input size and runtime for the
 various variants on long-running jobs (as previously defined to be jobs taking
@@ -2844,8 +2788,7 @@ inputs can be seen in Figure~\ref{fig:input-scatter}.
   \caption[Pearson Correlations Between Sizes of Inputs and Runtime]{Pearson
     correlations between size of inputs and the runtime of \textsc{Naive},
     \textsc{Hybrid}, and \textsc{DatafrogOpt} respectively, from high
-    correlation to \textsc{DatafrogOpt} runtime to low.}
-  \label{tab:correlations}
+    correlation to \textsc{DatafrogOpt} runtime to low.}\label{tab:correlations}
 \end{table}%
 
 It is clear here that inputs affecting all parts of the computation have a
@@ -2866,12 +2809,11 @@ and input sizes of any kind (Table~\ref{tab:correlations}).
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/corr_scatter.pdf}
-  \caption[Scatter Plot of Runtimes On Two Polonius Variants vs. nr. of CFG
+  \caption[Scatter Plot of Runtimes On Two Polonius Variants vs.\ nr.\ of CFG
   Edges and Variables]{Scatter plot of runtimes under the naive and optimised
     algorithms compared to variables and CFG edge count after having pruned
     extreme values (runtimes below 1~s or above 13~minutes). Y~axis is runtime
-    in seconds.}
-  \label{fig:input-scatter}
+    in seconds.}\label{fig:input-scatter}
 \end{figure}
 
 \chapter{Conclusions and Future Work}\label{cha:conclusions}
@@ -2951,8 +2893,7 @@ Bloom filters.
     suggestion for how the Polonius fact generation in Rust can be reorganised.
     Green boxes show inputs, black boxes Rust modules, and red modules (re)moved
     components. Note that boxes are grouped together according to the inputs
-    necessary for producing them.}
-  \label{fig:fact-refactor}
+    necessary for producing them.}\label{fig:fact-refactor}
 \end{figure}
 
 Finally, there is a need to refactor both Polonius itself (whose interface is
