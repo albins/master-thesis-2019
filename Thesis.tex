@@ -270,15 +270,16 @@ compile-time.
 \section{Contributions}
 
 The contributions made in this thesis specifically include the implementation of
-liveness and initialisation calculations (Sections~\ref{sec:var-livenes}
-and~\ref{sec:var-initalisation} respectively) in Polonius, previously computed
-in the Rust compiler before invoking Polonius. Additionally, this report
-analyses real-world Rust code found in ca 12~000 popular publicly available Git
+liveness and initialisation calculations (Sections~\ref{sec:liveness}
+and~\ref{sec:move-analysis} respectively) in Polonius, previously computed in
+the Rust compiler before invoking Polonius. Additionally, this report analyses
+real-world Rust code found in ca 12~000 popular publicly available Git
 repositories found on Crates.io and GitHub
-(Section~\ref{sec:field-study-borrow}). It compares two optimised variants of
+(Chapter~\ref{sec:field-study-borrow}). It compares two optimised variants of
 Polonius to a baseline naive implementation, and produces statistics on which
 types of inputs to Polonius typically dominate, drawing some conclusions on
-common coding patterns.
+common coding patterns, and uses these to suggest future improvements of
+Polonius (Section~\ref{sec:optimisations}).
 
 For clarity, sections detailing components not developed as part of this thesis
 are marked with~(\notmine{}). They are nonetheless included, as there has not
@@ -940,10 +941,11 @@ The following short-hand names are used:
 
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[h]
-\begin{tabular}{l l l l}
+\begin{tabular}{@{}l@{} @{}l@{} l@{} @{}l@{}}
   Fact & Code Example & Resulting Tuple(s) & Used \\ \hline
-  \InDatalog{borrow_region(R, L, P)} & \InRust{bb0[0]}: \InRust{_1 = &1;}& \InRust{('a, &1, p + 1)} & Bck  \\
-  \InDatalog{universal_region(R)} & \InRust{fn parse<'b>(bfr: &'b str)} & \InRust{('b)} & Bck \\
+  \InDatalog{borrow_region(R, L, P)} & \InRust{bb0[0]}: \InRust{_1 = &1;}&
+                                                                           \InRust{('a, &1, Mid(bb0[0]))} & Bck  \\
+  \InDatalog{universal_region(R)} & \InRust{fn f<'b>(x: &'b str)} & \InRust{('b)} & Bck \\
   \InDatalog{cfg_edge(P, Q)} &
                                \begin{tabular}[t]{@{}l l@{}}
                                  \InRust{bb0[0]}: & \InRust{_1 = 1;} \\
@@ -956,19 +958,50 @@ The following short-hand names are used:
                         \InRust{(Start(bb0[1]), Mid(bb0[1]))}\\
                         \end{tabular}
                         & All \\
-  \InDatalog{killed(L, P)} & & & Bck \\
-  \InDatalog{outlives(R1, R2, P)} & & & Bck \\
-  \InDatalog{invalidates(P, L)} & & & Bck  \\
-  \InDatalog{var_used(V, P)} & & & Lvs  \\
-  \InDatalog{var_defined(V, P)} & & & Lvs  \\
-  \InDatalog{var_drop_used(V, P)} & & & Lvs  \\
-  \InDatalog{var_uses_region(V, R)} & & & Lvs  \\
-  \InDatalog{var_drops_region(V, R)} & & & Lvs  \\
-  \InDatalog{child(M1, M2)} & & & Init  \\
-  \InDatalog{path_belongs_to_var(M, V)} & & & Init  \\
-  \InDatalog{initialized_at(M, P)} & & & Init  \\
-  \InDatalog{moved_out_at(M, P)} & & & Init  \\
-  \InDatalog{path_accessed_at(M, P)} & & & Init
+  \InDatalog{killed(L, P)} &
+                             \begin{tabular}[t]{@{}l l@{}}
+                               \InRust{bb0[0]}: &\InRust{_2 = &_1;} \\
+                               \InRust{bb0[1]}: &\InRust{_1 = 17;}
+                             \end{tabular}                                                    
+                      &
+                        \InRust{(&_1, Mid(bb0[1]))}
+                                           & Bck \\
+  \InDatalog{outlives(R1, R2, P)} &
+                                    \InRust{bb0[0]}: \InRust{p: &'p i32 = &'x x;}
+                                     & \InRust{('x, 'p, Mid(bb0[0]))} & Bck \\
+  \InDatalog{invalidates(P, L)} &
+                                  \begin{tabular}[t]{@{}l l@{}}
+                                    \InRust{bb0[0]}: & \InRust{_2 = &_1;} \\
+                                    \InRust{bb0[1]}: & \InRust{_1 = 3;}
+                                  \end{tabular}
+                      & \InRust{(Mid(bb0[1]), &_1)} & Bck  \\
+  \InDatalog{var_used(V, P)} & \InRust{bb0[0]}: \InRust{x + 1} & \InRust{(x, Mid(bb0[0]))} & Lvs  \\
+  \InDatalog{var_defined(V, P)} & \InRust{bb0[0]}: \InRust{x = 7} & \InRust{(x, Mid(bb0[0]))} & Lvs  \\
+  \InDatalog{var_drop_used(V, P)} & \InRust{bb0[0]}: \InRust{drop(x)} & \InRust{(x, Mid(bb0[0]))} & Lvs  \\
+  \InDatalog{var_uses_region(V, R)} & \InRust{let x: &'x i32;} & \InRust{(x, 'x)} & Lvs  \\
+  \InDatalog{var_drops_region(V, R)} &
+                                  \begin{tabular}[t]{@{}l@{}}
+                                    \InRust{struct Wrap<'p> { p: &'p i32 }} \\
+                                    \InRust{impl<'p> Drop for Wrap<'p> {...}} \\
+                                    \InRust{let x: Wrap = ...} \\
+                                    \InRust{drop(x)}
+                                  \end{tabular}
+                      & \InRust{(x, 'p)}& Lvs  \\
+  \InDatalog{child(M1, M2)} & \InRust{let x = (17, (23, 29));} &
+                       \begin{tabular}[t]{@{}l@{}}
+                         \InRust{(x.0, x)},\\
+                         \InRust{(x.1, x)},\\
+                         \InRust{(x.1.0, x.1)},\\
+                         \InRust{(x.1.1, x.1)}\\
+                        \end{tabular}
+                                                           
+
+
+       & Init  \\
+  \InDatalog{path_belongs_to_var(M, V)} & \InRust{let x = (17, (23, 29));} & \InRust{(x, x)} & Init  \\
+  \InDatalog{initialized_at(M, P)} & \InRust{bb0[0]}: \InRust{x.0 = 17;} & \InRust{(x.0, Mid(bb0[0]))} & Init  \\
+  \InDatalog{moved_out_at(M, P)} & \InRust{bb0[0]}: \InRust{f(move x.0)} & \InRust{(x.0, Start(Success(bb0[0])))} & Init  \\
+  \InDatalog{path_accessed_at(M, P)} & \InRust{bb0[0]}: \InRust{x.val + 7} & \InRust{(x.val, Mid(bb0[0]))} & Init
 \end{tabular}
 \caption[Input Facts to Polonius]{Polonius Input Facts}
   \label{tab:input-facts}
@@ -1363,7 +1396,9 @@ Specifically, the rule is as follows: if a variable~$v$ is live in some
 point~$q$ and~$q$ is reachable from $p$ in the control-flow graph, then~$v$ is
 live in~$p$ too unless it was overwritten. Like initialisation, it is also
 imprecise with respect to branchings, as there is no way to know statically
-which branch is taken.
+which branch is taken. We refer to this type of liveness as
+\textit{use-liveness}, owing to the fact that the liveness comes from variable
+use.
 
 \begin{sourcecode}
   \captionof{listing}{The rules for calculating use-liveness: a variable is
@@ -1386,22 +1421,18 @@ When Rust's variables go out of scope, they are implicitly deallocated, or
 dropped in Rust parlance. Explicit deallocation is also possible by calling the
 function \InRust{drop()}, which takes ownership of a variable (that is,
 deinitialises it) and performs deallocation, or, for complex objects, calls the
-\InRust{drop()} method. For some types such as integers, deallocation is not
-necessary and the compiler generates no actual \InRust{drop()}:s in the MIR.
-However, the process of inferring this, called drop elision, happens after
-Polonius is invoked, and therefore Polonius needs to calculate which
-\InRust{drop()} statements would be no-ops.
+\InRust{drop()} method.
 
-Rust provides a default deallocator for data structures, but it can be
-overridden. This has repercussions on liveness calculations, because while the
-default deallocator for an object never needs to access its fields except to
-deallocate them, a custom deallocator might access any of them in arbitrary
-ways. This means that any conditions of a loan that resulted in a reference $r$
-stored in a \InRust{struct} $s$ instance $a$ must only be respected as far as
-\InRust{a.drop()} is concerned if $s$ implements a custom deallocator. Otherwise
-the loan of $r$ may be safely violated, as the default deallocator never
-dereferences $r$ and thus does not require $r$ to be valid. An illustration of
-this can be seen in Figure~\ref{fig:drop-liveness}.
+Rust provides a default deallocator for data structures, which can be
+overridden. This has repercussions on liveness calculations. While the default
+deallocator for an object never accesses its fields, and therefore does not make
+them live, a custom deallocator might access any of them in arbitrary ways. This
+of includes references stored in the struct, whose provenance variables must be
+considered live. Intuitively, this follows from the fact that the deallocator
+may use the references in the \InRust{struct}, and that the conditions of their
+loans must therefore be respected, and we say that the variable holding the
+struct is \textit{drop-live}. An example can be found in
+Figure~\ref{fig:drop-liveness}.
 
 
 \begin{figure}
@@ -1414,7 +1445,7 @@ this can be seen in Figure~\ref{fig:drop-liveness}.
   \captionof{listing}{The custom deallocator for \InRust{OwnDrop} enforces the
     loan giving the reference \InRust{data} until the struct is deallocated, but
     the loan in \InRust{DefaultDrop} is effectively dead as soon as it has no
-    direct uses in the code and thus can be violated.}
+    direct uses in the code and thus can be violated.}\label{lst:drop-liveness}
 \begin{minted}{rust}
 struct OwnDrop<'a> {
     data: &'a u32,
@@ -1461,26 +1492,25 @@ fn main() {
 \end{figure}
 
 Following the MIR translation of Listing~\ref{lst:drop-liveness} in
-Figure~\ref{fig:mir-drop}, we see across the slightly confusing re-borrows used
-to move the created references into the \InRust{struct}s that the only block of
-the function ends with a call to \InRust{drop()} that would invoke the custom
+Figure~\ref{fig:drop-liveness}, we see across the re-borrows used to move the
+created references into the \InRust{struct}s that the function's single block
+terminates in a call to \InRust{drop()} that would invoke the custom
 deallocator. Here, the deallocator for \InRust{b}, our instance of
-\InRust{DefaultDrop}, is never even called at all.
+\InRust{DefaultDrop}, is never even called at all, as its sole element, a
+reference, requires no deallocation.
 
 Drop-liveness is calculated in a similar fashion to use-liveness, with the
-exception that a deinitialised variable is never dropped, and therefore is not
-considered drop-live. This is the reason for the computation of variables that
-might be initialised in the previous section. The rules can be found in
-Listing~\ref{lst:use-live}.
+exception that a moved variable is never dropped, as it is now owned (and
+therefore deallocated) by the context it was moved to. This is the reason for
+the computation of variables that might be initialised in
+Section~\ref{sec:move-analysis}. The rules can be found in
+Listing~\ref{lst:drop-live}.
 
 Note the use of the first rule, which is not transitive, to shift the point of
 the initialisation from the input's mid-point index (which is where a
 (de)initialisation would take effect) to the statement's starting-point. This is
 because a drop-use would only happen if the \InRust{x} was initialised on
 \textit{entry} to the instruction \InRust{drop(x)}.
-
-An example of the output from this calculation can be seen in
-Figure~\ref{fig:liveness-graph}.
 
 \begin{sourcecode}
   \captionof{listing}{The rules for calculating drop-liveness: the rules are
@@ -1505,16 +1535,16 @@ var_drop_live(V, P) :-
 \end{minted}
 \end{sourcecode}
 
+\subsection{Variable Liveness to Provenance Variable Liveness}\label{sec:region-live-at}
+
 The two kinds of liveness are then used to calculate the reference liveness
 relation (Listing~\ref{lst:region-live-at}), which serves as input for the rest
 of the borrow checker. A given provenance variable~$R$ is live at some point~$p$
-if it is in the type of a variable~$v$ which is either drop-live or use-live
-at~$p$, with some notable caveats for drop-liveness (discussed in
-Section~\ref{sec:deall-as-spec}) embedded in the \InDatalog{var_drops_region}
-relation. In essence, even if $v$ is a \InRust{struct} containing a reference
-with a provenance variable~$R$, this point would have
-\InDatalog{var_drops_region(V, R)}, showing that the drop-use of $v$ would
-require the liveness of the variable holding a reference with $R$ in its type.
+if it is in the type of a use-live variable~$v$, or if it is associated to a
+drop-live variable. While the connection between use-live variables and their
+provenances is direct, the connection between a use-live variable and its
+provenance variable(s) is \textit{indirect}; any reference stored inside the
+drop-live \InRust{struct} in~$v$ is live at~$p$ if~$v$ is drop-live there.
 
 \begin{sourcecode}
   \captionof{listing}{A provenance variable is live if it either belongs to a
