@@ -1432,7 +1432,7 @@ that they involve the same region in memory.
 
 
 The fact that the borrow check is performed on paths means that the following
-code, for example, is sound, as the paths, and therefore also the loans do not
+code, for example, is sound, as the paths and therefore also the loans do not
 overlap:
 \begin{minted}{rust}
 struct Point(u32, u32);
@@ -1658,72 +1658,193 @@ region_live_at(R, P) :-
 \begin{table}[h]
   \begin{tabular}{@{}l l m{5.5cm}}
     Atom/Fact & Type & Description \\ \hline
-    Provenance\notmine & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
-    Point\notmine & Atom & A point in the control-flow graph. \\
-    Variable & Atom & A MIR (or Rust) variable. \\
+    Provenance\notmine & A & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine & A & A point in the control-flow graph. \\
+    Variable & A & A MIR (or Rust) variable. \\
     Path & Atom & A move path. \\
-    \InDatalog{cfg_edge(P, Q)}\notmine & Fact & A transition in the CFG. \\
-    \InDatalog{child(Path2, Path1)} & Fact & \InDatalog{Path1} is a prefix of-, and not equal to \InDatalog{Path2}  \\
-    \InDatalog{initialized_at(Path, P)} & Fact & This path was given a value here. \\
-    \InDatalog{path_belongs_to_var(Path, V)} & Fact & This path is the root path of variable $V$. \\
-    \InDatalog{moved_out_at(Path, P)} & Fact & This path was moved from this scope in an expression here. \\
-    \InDatalog{path_initialized_on_exit(Path, Point)} & Intermediate & This move path is initialized on exit from this CFG node.\\
-    \InDatalog{var_initialized_on_exit(V, Point)} & Output & This variable is initialised on exit from this CFG node. \\
+    \InDatalog{cfg_edge(P, Q)}\notmine & F & A transition in the CFG. \\
+    \InDatalog{child(Path2, Path1)} & F & \InDatalog{Path1} is a prefix of-, and not equal to \InDatalog{Path2}  \\
+    \InDatalog{initialized_at(Path, P)} & F, I & This path was given a value here. \\
+    \InDatalog{path_belongs_to_var(Path, V)} & F & This path is the root path of variable $V$. \\
+    \InDatalog{path_accessed_at(Path, Point)} & F, I & This move path is used in an expression here.\\
+    \InDatalog{moved_out_at(Path, P)} & F, I & This path was moved from this scope in an expression here. \\
+    \InDatalog{ancestor(Above, Below)} & I & \InDatalog{Above} is a prefix of \InDatalog{Below}.\\
+    \InDatalog{path_init_lub_exit(Path, Point)} & I & \InDatalog{Path} is initialized without subsequent deinitialisation on one or more branches reaching this CFG node (lowest upper bound on set membership).\\
+    \InDatalog{var_init_glb_entry(Var, Point)} & I & This variable is initialised on all branches reaching this CFG node (greatest lower bound on membership). \\
+    \InDatalog{path_moved_lub_exit(Path, Point)} & I & \InDatalog{Path} has been moved without subsequent reinitialisation on at least one branch reaching this CFG node. \\
+    \InDatalog{var_init_lub_exit(V, Point)} & O & This variable is initialised along at least one branch reaching this node at the time of its exit. \\
+    \InDatalog{move_error(Path, Point)} & O & Error: \InDatalog{Path} is accessed here, but may have been moved, or was never initialised. \\
   \end{tabular}
 \caption{Move Analysis Dramatis Personae}
   \label{tab:move-facts-recap}
 \end{table}%
 }
 
-The idea behind variable initialisation calculations is a fairly straightforward
-transitive closure computation. Initialisation for a path propagates forwards
-from an initialisation event across the CFG until the path is deinitialised. As
-a consequence of this, initialisation tracking is imprecise (over-estimating)
-upon branching; if one path to a node in the CFG has $v$ initialised and one
-does not, $v$ is considered initialised for the purposes of this analysis.
+The idea behind the move analysis is a fairly straightforward transitive closure
+computation. Initialisation (\InDatalog{path_initialized_lub_exit}) propagates
+forwards from an assignment (\InDatalog{initialized_at}) across the CFG
+(\InDatalog{cfg_edge}) until the path is moved (\InDatalog{moved_out_at}). We
+also transitively follow the move path tree downwards on each event, so that a
+use of \InRust{x} would also use \InRust{x.f}, for example. This transitive
+expansion of facts happens in a pre-computation described in
+Section~\ref{sec:move:fixpoints}. Finally, we trace root paths (and therefore
+also their transitive children) back to their variables through
+\InDatalog{path_belongs_to_var}.
 
-For the purposes of this analysis, we mean by initialisation also partial
-initialisation of a complex variable. Therefore, initialisation also propagates
-upwards through the path tree, such that \InRust{x} is (partially) initialised
-whenever \InRust{x.y} is. An expression like \InRust{move x} would, in this
-example, only emit \InDatalog{moved_out_at(x, P)} as a starting fact. This means
-that currently, initialisation tracking is imprecise with respect to parts of
-the variable as well as across branchings, a strictly speaking unnecessary
-imprecision. Future versions of Polonius will instead use a precise calculation
-here, but for the purposes of determining drop-liveness in the next section
-these calculations will suffice.
+However, Rust programs like all Turing-complete programs, are not deterministic.
+Therefore initialisation tracking is necessarily imprecise upon branching; if
+one branch in the CFG has \InDatalog{Path} initialised and one does not, we must
+decide on whether to over-estimate (assume \InDatalog{Path} is initialised), or
+under-estimate (assume \InDatalog{Path} is deinitialised) after the branches
+join. As it turns out, the move analysis does both. When we want to determine if
+a variable might be involved in a deallocation for the purposes of later
+figuring out live references in Section~\ref{sec:deall-as-spec}, we
+over-estimate (Section~\ref{sec:var-maybe-initialised}). When we want to figure
+out if it is safe to access a variable or if we should generate a move error, we
+under-estimate (Section~\ref{sec:move-errors}).
 
-Finally, \InDatalog{path_belongs_to_var(M, V)} connects paths to their root
-variables. It is worth noting here that this fact only needs to contain a
-mapping of the root path to a variable, as initialisation always bubbles up
-through the tree due to the imprecision mentioned above. The full Datalog code
-is shown in Listing~\ref{lst:var-initialised}.
+\subsection{Figuring Out The Move Tree}\label{sec:move:fixpoints}
+
+The analysis begins with a pre-computation step that expands the path-related
+facts so that an initialisation of a prefix also initialises its children,
+grandchildren, etc. The Datalog for this can be found in
+Listings~\ref{lst:ancestor} and~\ref{lst:transitive-moves}. The transitive
+expansion happens for all the path-related facts: \InDatalog{initialized_at},
+\InDatalog{accessed_at}, \InDatalog{moved_out_at}, and \InDatalog{child} (which
+becomes \InDatalog{ancestor}). The names are re-used in later steps to reflect
+the fact that we see this as a pre-computation step expanding compressed facts
+from Rust.
 
 \begin{sourcecode}
-  \captionof{listing}{The rules for computing possible partial variable
-    initialisation. A path is trivially initialised where it is actually
-    initialised. It is transitively initialised in all points reachable from a
-    point where it is initialised, and where it has not been deinitialised
-    (moved out). Initialisation propagates upwards in the move path tree, until
-    it reaches the variable at the root of the path.}\label{lst:var-initialised}
+  \captionof{listing}{Calculating the move path tree; a path is the
+    \InDatalog{ancestor} of all its children and their children
+    transitively.}\label{lst:ancestor}
+\begin{minted}{prolog}
+ancestor(Mother, Daughter) :- child(Daughter, Mother).
+
+ancestor(Grandmother, Daughter) :-
+    ancestor(Mother, Daughter),
+    child(Mother, Grandmother).
+\end{minted}
+\end{sourcecode}
+
+\begin{sourcecode}
+  \captionof{listing}{Calculating transitive moves: a move, initialisation, or
+    an access to a prefix transitively moves, initialises, or accesses all of
+    the prefix' children. Identical rules for for \InDatalog{initialized_at} and
+    \InDatalog{accessed_at} have been omitted.}\label{lst:transitive-moves}
+\begin{minted}{prolog}
+moved_out_at(Path, P) :- moved_out_at(Path, P).
+
+moved_out_at(Child, P) :-
+     moved_out_at(Parent, P),
+     ancestor(Parent, Child).
+\end{minted}
+\end{sourcecode}
+
+\subsection{Over-Estimating Initialisation for Later
+  Use}\label{sec:var-maybe-initialised}
+
+We begin initialisation tracking on assignments. A path is trivially initialised
+in a statement where it is initialised (\InRust{x.f = 17}), and stays
+initialised in the subsequent program points unless it is moved out by a move
+expression (\InRust{move x.f}, or \InRust{move x}). The imprecision is
+introduced by the join to \InDatalog{cfg_edge}; it is enough for one connecting
+edge to \InDatalog{Q} to have \InRust{x.f} initialised for it to be initialised
+at \InDatalog{Q}.
+
+Finally, we relate the initialisation of root paths back to their variables
+through \InDatalog{path_belongs_to_var}. This means that we only track variables
+that are moved at the root level (\InRust{move x}, as opposed to \InRust{move
+  x.f}), and (for this purpose) ignore partial deinitialisation. This is safe to
+do as this information is only used to determine whether a deallocation of a
+variable would actually happen, and a deallocation is only guaranteed to be a
+no-op if the entire variable was provably moved.~\footnote{However, partial
+  deallocation could still cause a move error when the variable is accessed
+  during deallocation, as discussed in Section~\ref{sec:move-errors}.} The full
+listing for the code can be found in Listing~\ref{lst:var-initialised}.
+
+\begin{sourcecode}
+  \captionof{listing}{The rules for over-approximating variable initialisation.
+    A path is trivially initialised where it is actually initialised. It is
+    transitively initialised in all points reachable from a point where it is
+    initialised, and where it has not been deinitialised (moved out). Variables
+    are initialised if their root path is
+    initialised.}\label{lst:var-initialised}
 \begin{minted}{prolog}
 path_maybe_initialized_on_exit(Path, Point) :- 
     initialized_at(Path, Point).
 
-path_maybe_initialized_on_exit(M, Q) :-
-    path_maybe_initialized_on_exit(M, P),
+path_maybe_initialized_on_exit(Path, Q) :-
+    path_maybe_initialized_on_exit(Path, P),
     cfg_edge(P, Q),
-    !moved_out_at(M, Q).
+    !moved_out_at(Path, Q).
 
-path_maybe_initialized_on_exit(Mother, P) :-
-    path_maybe_initialized_on_exit(Daughter, P),
-    child(Daughter, Mother).
-
-var_maybe_initialized_on_exit(V, P) :-
-    path_belongs_to_var(M, V),
-    path_maybe_initialized_at(M, P).
+var_maybe_initialized_on_exit(Var, P) :-
+    path_belongs_to_var(Path, Var),
+    path_maybe_initialized_at(Path, P).
 \end{minted}
 \end{sourcecode}
+
+\subsection{Under-Estimating Initialisation for Move
+  Errors}\label{sec:move-errors}
+\textbf{Warning}: \textit{The code in this section is an entirely unverified
+  draft version, as the addition of new kinds of errors to Polonius requires a
+  significant re-architecture which has not happened at the time of writing.
+  However, such an extension is necessary in order to at all verify the output
+  of these computations, which means that they are at present completely
+  untested. Ongoing discussion can be followed at
+  \url{https://github.com/rust-lang/polonius/pull/135}.}
+
+The principle behind extracting move errors is this: an \textit{error} is an
+\textit{access to a possibly moved or uninitialised path}. Reversing this
+definition gives us: the set of move errors at a given point is the set of path
+accesses, (set) minus those that are \textit{provably initialised} at that
+point. A similar inversion is used to determine the set of provably initialised
+path-point combinations: the set of definitely initialised paths at a point is
+the set of possibly initialised paths at that point (computed in the previous
+section), minus the set of possibly \textit{moved} paths, computed analogously
+to the over-approximated set of initialised ones.
+
+These relations are computed in Listings~\ref{lst:move-error} (move errors),
+\ref{lst:path-definitely-initialised} (provably initialised paths),
+and~\ref{lst:path-maybe-moved} (possibly deinitialised paths).
+
+\begin{sourcecode}
+  \captionof{listing}{A move error is a path access to any path that is not
+    provably initialised.}\label{lst:move-error}
+\begin{minted}{prolog}
+move_error(Path, Point) :-
+    path_accessed_at(Path, Point),
+    !path_definitely_initialized_at(Path, Point).
+\end{minted}
+\end{sourcecode}
+
+\begin{sourcecode}
+  \captionof{listing}{A path is provably initialised if may be initialised and
+    may not have been moved.}\label{lst:path-definitely-initialised}
+\begin{minted}{prolog}
+path_definitely_initialized_at(Path, Point) :-
+   path_maybe_initialized_on_exit(Path, Point),
+   !path_maybe_moved_at(Path, Point).
+\end{minted}
+\end{sourcecode}
+
+\begin{sourcecode}
+  \captionof{listing}{A \InDatalog{Path} may have been moved at a
+    \InDatalog{Point} if it was moved on the way there without being
+    subsequently reinitialised.}\label{lst:path-maybe-moved}
+\begin{minted}{prolog}
+path_maybe_moved_at(Path, Point) :- moved_out_at(Path, Point).
+
+path_maybe_moved_at(Path, Point2) :-
+    path_maybe_moved_at(Path, Point1),
+    cfg_edge_(Point1, Point2)
+    !initialized_at(Point1, Point2).
+\end{minted}
+\end{sourcecode}
+
+
 \section{Loan Constraint Propagation\notmine{}}\label{sec:loan-constr-prop}
 
 { \renewcommand{\arraystretch}{1.0}
