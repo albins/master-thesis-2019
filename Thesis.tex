@@ -355,21 +355,29 @@ A notable detail of the borrow check is what is meant by a ``variable''. In
 Rust, some data structures, such as \InRust{struct}s, and tuples, are analysed
 at the granularity of the individual components, which may have arbitrarily deep
 nesting (known at compile-time). This means that the following code, for
-example, \emph{does} pass the borrow check, as the loans don't overlap:
+example, \emph{does} pass the borrow check, as the loans do not overlap:
 \begin{minted}{rust}
 struct Point(u32, u32);
 
 let mut pt: Point = Point(6, 9);
 let x = &mut pt.0;
 let y = &mut pt.1;
-// no error; our loans don't overlap!
+// no error; our loans do not overlap!
 \end{minted}
 
 In our instance, the root variable \InRust{pt} contains the \emph{paths}
 \InRust{pt.1} and \InRust{pt.2}. Such paths constitute a tree with its root in
 the variable itself. Both the core borrow check and the initialisation tracking
-that we will discuss reasons about variables on the path level, with some
-notable exceptions including vectors and arrays.
+that we will discuss reasons about variables on the path level. It is worth
+pointing out that dynamic structures like vectors, as well as arrays, are not
+analysed at this granularity, but are considered one object. In Rust compiler
+parlance, we say that a path points to a \emph{place}, corresponding literally
+to the place in memory holding its data.
+
+Finally, we sometimes talk of a path having \emph{prefixes}, where a prefix is
+anything above a ``leaf'' in the tree spanning all paths. For example, the path
+\InRust{x.y} would have the prefixes \InRust{x} and \InRust{x.y}. This is useful
+when reasoning 
 
 \section{Why a Reformulation?}
 \label{sec:background:why}
@@ -421,6 +429,9 @@ The logic of the borrow check as described in
 Section~\ref{sec:reference-provenance} is calculated at the level of an
 intermediate representation of Rust called the Mid-Level Intermediate
 Representation (MIR), corresponding to the basic blocks of program control flow.
+Rust is lowered to MIR after regular type checking and after a series of earlier
+transformations, as seen in Figure~\ref{fig:rustc-overview}.
+
 The input data to the Polonius solver is generated in the Rust compiler by
 analysing this intermediate representation. This means that we can safely assume
 to be working with simple variable-value assignment expressions, of the type
@@ -855,8 +866,8 @@ The following short-hand names are used:
 \item[\InDatalog{cfg_edge(P, Q)}] whenever there is a transition~$P \rightarrow
   Q$ in the control flow graph.
     
-\item[\InDatalog{killed(L, P)}] when some prefix of the path (\fixme{explain
-    prefixes and paths}) borrowed in $L$ is assigned at point~$P$.
+\item[\InDatalog{killed(L, P)}] when some prefix of the path borrowed in $L$ is
+  assigned at point~$P$.
     
 \item[\InDatalog{outlives(R1, R2, P)}] when $R_1 \subseteq R_2$ must hold at
   point~$P$, a consequence of subtyping relationships as described in
@@ -882,17 +893,15 @@ The following short-hand names are used:
 
 \item[\InDatalog{child(M1, M2)}] when the move path $M_1$ is the child of $M_2$,
   That is, for example in the expression \InRust{x.y.z}, \InRust{x.y.z} is a
-  child of \InRust{x.y} and \InRust{x}. \fixme{Is this direct parenthood or
-    transitive?}
+  child of \InRust{x.y} and \InRust{x}.
 
-\item[\InDatalog{path_belongs_to_var(M, V)}] for every move path $M$ that starts
-  in variable $V$. \fixme{verify that this doesn't just return the root path
-    into $V$, and if so; clarify and propagate to facts.rs!}
+\item[\InDatalog{path_belongs_to_var(M, V)}] if $M$ is the root path into $V$.
 
 \item[\InDatalog{initialized_at(M, P)}] when the move path $M$ was initialized
   at point $P$, such as for example in the expression \InRust{x.y = 17}, which would
-  initialise the path \InRust{x.y}. \fixme{Verify what happens when we
-    initialise the only child of a path; does that path also become initialised?}
+  initialise the path \InRust{x.y}. Note that the fact is emitted only for the
+  specific path being initialised, and that the transitive initialisation of the
+  prefix' children is implicit.
 
 \item[\InDatalog{moved_out_at(M, P)}] when the move path $M$ was moved out
   (deinitialised) at point $P$.
@@ -911,8 +920,9 @@ Initialisation for a leaf path propagates exactly like use-liveness, except
 forwards across the CFG. The path-specific difference is that initialisation
 also travels upwards through the path tree, such that \InRust{x} is (partially)
 initialised whenever \InRust{x.y} is. An expression like \InRust{move x} would,
-in this example, \emph{both} emit \InDatalog{moved_out_at(x, p)} \emph{and}
-\InDatalog{moved_out_at(x.y, p)}. \fixme{verify that this is correct!}
+in this example, only emit \InDatalog{moved_out_at(x, p)} as a starting fact.
+Finding the transitive closure given by projecting the move across all of the
+path's children would happen in Polonius.
 
 Finally, paths are traced back to their root variables across the
 \InDatalog{path_belongs_to_var(P, V)} fact. It is worth noting here that this
@@ -1369,6 +1379,12 @@ repository were unique, as the outputs were stored per-repository. The median
 number of functions in the dataset was 47, including functions generated by
 desugaring as well as user-written functions.
 
+All experiments were run on a dedicated desktop computer running a 64-bit
+version of Ubuntu~19.04 with Linux 5.0.0-20-generic. The machine had 16~GBs of
+2666~MHz CL16 DDR4~RAM, and a AMD Ryzen~5 2600 CPU running at a base clock of
+3.4~GHz (max boost clock 3.9~GHz) with cache sizes of 576~KB (L1), 3~MB (L2),
+and 16~MB (L3).
+
 It is worth pointing out that Polonius' analysis as part of the Rust compiler
 will be performed on non-compiling Rust code as well, and that the requirement
 that all crates must compile is an entirely artificial one and might exclude
@@ -1509,9 +1525,15 @@ respectively.
 
 \section{Optimising the Borrow Checker}\label{sec:optim-borr-check}
 
-% known problem with large static arrays
+Before Polonius can replace NLL as the Rust borrow checker, it would need
+considerable performance improvements in both its fact generation process as
+well as the solving itself. In its current condition, the fact generation code,
+in particular, performs multiple walks across the CFG, needlessly increasing
+runtime. Additionally, many of the inputs are computed unnecessarily, and, for
+example, the CFG could be compressed for some cases.
 
-% implied constraints, symmetries, optimisations
+Finally, Datafrog itself could be optimised, including using faster vector
+instructions or parallelisation techniques.
 
 \chapter{Conclusions and Future Work}\label{cha:conclusions}
 %\epigraph{\fixme{short quote}}
