@@ -252,9 +252,10 @@ Most of these examples are borrowed from
     let x = pt;
     let y = pt; // ERROR: pt was already moved to x
   \end{minted}
-\item[There can be any number of shared references] A reference, also called a
-  \textit{borrow} of a variable, is created with the \InRust{&} operator, and
-  there can be any number of references to a variable:
+\item[There can be any number of shared references] A shared reference, also
+  called a \textit{borrow} of a variable, is created with the \InRust{&}
+  operator, and there can be any number of simultaneously live shared references
+  to a variable:
   \begin{minted}{rust}
     struct Point(u32, u32);
     
