@@ -365,10 +365,6 @@ terms of the loans in $r$ must be respected at that point.
 
 \section{Deallocation As a Special Case of Variable Use}
 \label{sec:deall-as-spec}
-
-\fixme{describe the difference between drop-uses and normal uses and what is
-  even a drop.}
-
 When Rust's variables go out of scope, they are implicitly deallocated, or
 dropped in Rust parlance. Explicit deallocation is also possible by calling the
 function \InRust{drop()}, which takes ownership of a variable and performs
