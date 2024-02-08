@@ -254,11 +254,14 @@ shows that explicit tuple storage sometimes vastly outperforms BDDs in terms of
 execution time~\cite{smaragdakis_using_2010}, as do sparse
 bitmaps~\cite{Hardekopf:2007:AGF:1250734.1250767}.
 
-Formally, the semantics of Rust's lifetime rules has been captured in the
-language Oxide, described by
-\citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}. This report will
-therefore not concern itself with the semantics of the borrow rules, except
-where necessary to explain the rules.
+Formally, the semantics of Rust's lifetime rules have been captured in the
+language Oxide, described by \citeauthor{weiss_oxide:_2019} in a draft paper
+which describes a minimal Rust-like language called Oxide along with its type
+system~\cite{weiss_oxide:_2019}. Oxide is notable in that it shares
+Polonius' view of variables as sets of possible loans that would give rise to
+the reference. However, as the Oxide paper already covers the formalisms of such
+a type system, this report will not concern itself with the semantics of the
+borrow rules except where necessary.
 
 % UPDATE: make sure that this section is up to date:
 The contributions made within the scope of the thesis project specifically
