@@ -376,6 +376,8 @@ notable exceptions including vectors and arrays.
 \section{The Borrow Check in the Rust Compiler}
 \label{sec:rust-specificts}
 
+\fixme{A nice diagram of the Rust compilation process here!}
+
 The logic of the borrow check as described in
 Section~\ref{sec:reference-provenance} is calculated at the level of an
 intermediate representation of Rust called the Mid-Level Intermediate
@@ -385,6 +387,11 @@ analysing this intermediate representation. This means that we can safely assume
 to be working with simple variable-value assignment expressions, of the type
 \InRust{_1 = _2}, as opposed to complex expressions involving multiple variables
 on the right-hand side.
+
+The MIR consists of basic blocks in the traditional compilers sense, each
+containing a set of statements and usually ending with a \emph{terminator}, an
+expression providing a branching to other basic
+blocks~\cite{mir_rfc,rustc_developers_guide_nodate}.
 
 % Removed because we never actually calculate these in the report
 % \fixme{Rust uses \emph{supporting prefixes} to refer to the parts of a variable
@@ -466,7 +473,8 @@ valid if~$\pi$ is the only name for that value and removes that value from the
 environment, effectively deallocating it.
 
 \begin{equation}\label{eq:t-move}
-  \ntyperule{\Gamma \vdash_{\text{mut}} \pi : \tau^s \:\: \text{noncopyable } \tau^s}{\Sigma ; \Delta ; \Gamma \vdash \expression{\pi} : \tau^s \implies \Gamma - \pi}
+  \ntyperule{\Gamma \vdash_{\text{mut}} \pi : \tau^s \:\: \text{noncopyable } \tau^s}
+  {\Sigma ; \Delta ; \Gamma \vdash \expression{\pi} : \tau^s \implies \Gamma - \pi}
   \end{equation}
 
   The second rule, Rule~\eqref{eq:t-borrow}, tells that we may create an
@@ -476,7 +484,8 @@ environment, effectively deallocating it.
   containing only that loan, denoted $^{\omega}\pi$''.
 
 \begin{equation}\label{eq:t-borrow}
-  \ntyperule{\Gamma \vdash_{\omega} \pi : \tau}{\Sigma ; \Delta ; \Gamma \vdash \expression{\&\omega \pi} : \left \{ ^{\omega}\pi\right \} \omega \tau \implies \Gamma}
+  \ntyperule{\Gamma \vdash_{\omega} \pi : \tau}
+  {\Sigma ; \Delta ; \Gamma \vdash \expression{\&\omega \pi} : \left \{ ^{\omega}\pi\right \} \omega \tau \implies \Gamma}
 \end{equation}
 
 Judgments on the form~$\Gamma \vdash_{\omega} \pi \: : \: \tau$ mean that ``in
@@ -495,23 +504,47 @@ introduces the approximate aspect of provenances. Finally, I will also describe
 how provenance variables come into relation with each other through type
 unification.
 
-Since the borrow check is performed on the MIR, we do not have branchings or
-function calls in the normal sense. Therefore, the sequencing and branching
-rules of Oxide only translate analogously~\cite{weiss_oxide:_2019}. As in Oxide,
-the ``type environment'' of the MIR is threaded through the typing of each
+Since the borrow check is performed on the MIR, Polonius does not handle
+branchings in the normal sense. Therefore, the sequencing and branching rules of
+Oxide only translate analogously~\cite{weiss_oxide:_2019}. As in Oxide, the
+``type environment'' of the MIR is threaded through the typing of each
 expression, such that the sequence of expressions~$\expression{e_1; e_2}$ would
 first type-check~$e_1$ and then~$e_2$ in the resulting environment. To capture
 this, I will use the name~$\Gamma_p$ to refer to the type-environment mapping
 places to their types just before evaluating an arbitrary point~$p$ of the~CFG.
 
-\fixme{describe the branching rules and how they come to be fixpoint calculations}
+In Oxide, the typing rules for branch expressions provide for a type unification
+of the if expression such that its value unifies the provenance variables. The
+MIR produced by such a branching would have a loop starting at the head of the
+\InRust{if} expression and ending with an assignment to the same variable in
+each branch before finally joining in a basic block where the assigned variable
+now could have come from either arm. The same unification in Polonius has two
+aspects to it: approximation of reference origins, captured by transfer across
+CFG edges in the MIR, and type unification, captured on assignment.
 
-\fixme{describe type unification}
+Simply put, each assignment allows different types on each side of the
+assignment, as long as the types unify, as seen in Rule~\eqref{eq:t-assignment}.
+This leads to the same type-unification for references as seen in Oxide
+(Rule~\eqref{eq:u-ref}). In practice, this means that each assignment of a
+place~$\pi_1$ from another place~$\pi_2$ in the environment~$\Gamma$ updates
+$\Gamma$ to have a new mapping such that $\pi_2$'s provenance variable~$\rho_2$
+is a superset of $\pi_1$'s.
 
-\fixme{describe assignment rules}
+Finally, in Oxide's \textsc{T-Branch} rule for branching, the type environments
+are unified into an approximate type environment that combines provenances in
+the variables from each branch. In Polonius, the corresponding logic is simply
+that a basic block's starting place-environment~$\Gamma$ is the transitive
+closure of the union of the place-environments at the terminators of the
+previous blocks.
 
-\begin{equation}\label{eq:subtype}
-\ntyperule{a \subseteq b}{\InRust{&'a u32} <: \InRust{&'b u32}}
+\begin{equation}\label{eq:t-assignment}
+  \ntyperule{\pi_1 : \tau_1 \:\: \pi_2 : \tau_2 \:\: \tau_1 \sim \tau_2 \implies \tau \:\: \Gamma \vdash_{uniq} \pi_1}
+  {\Sigma ; \Delta ; \Gamma \vdash \expression{\pi_1 = \pi_2} \: : \: \tau \implies \Gamma - \pi_1, \pi_1 \: : \: \tau}
+\end{equation}
+
+\begin{equation}\label{eq:u-ref}
+  \ntyperule{\tau_1 \sim \tau_2 \implies \tau \:\:\: \rho_1 \cup \rho_2 = \rho}
+  {\&\rho_1 \omega \tau_1 \sim \& \rho_2  \omega \tau_2 \implies \&\rho \omega \tau}
 \end{equation}
 
 Under these rules, a Rust function is valid from the perspective of the borrow
