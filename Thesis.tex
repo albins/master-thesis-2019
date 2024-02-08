@@ -164,6 +164,8 @@
 \definecolor{red}{rgb}{1.0, 0.41, 0.38}
 \definecolor{green}{rgb}{0.47, 0.87, 0.47}
 
+\setlength{\epigraphwidth}{0.55\textwidth}
+
 \begin{document}
 % Sync the counters:
 \counterwithin{listing}{section}
@@ -229,10 +231,10 @@ by partial sight and limited voice--not partiality for its own sake but, rather,
 for the sake of the connections and unexpected openings situated knowledges make
 possible. Situated knowledges are about communities, not about isolalted
 individuals. \textbf{The only way to find a larger vision is to be somewhere in
-  particular} [emphasis mine].}%
-{Donna Haraway, \citetitle{haraway}~(\citeyear{haraway})}
+  particular}}%
+{Donna Haraway, \citetitle{haraway}~(\citeyear{haraway}), emphasis mine}
 
-{\footnotesize Being easily confused about the reality of the world, one of my
+{ Being easily confused about the reality of the world, one of my
   epistemologic touchstones is Donna Haraway's classic notion of
   \textit{situated knowledges}, as formulated in the quote above and published
   the year I was born~\cite{haraway}. I do not pretend to understand everything
@@ -268,7 +270,9 @@ that these stupid machines are supposed to be \emph{fun}.
 }
 
 \chapter{Introduction}
-\epigraph{\fixme{short quote}}{hello}
+\epigraph{Something is rotten in the state of Denmark}%
+{Marcello, somewhat geographically challenged, on my contributions to Polonius.
+  \textit{Hamlet}, Act-I, Scene-IV}
 %\mainmatter{}
 Rust is a young systems programming language originally developed at Mozilla
 Research~\cite{matsakis_rust_2014}. Its stated intention is to combine
@@ -330,6 +334,9 @@ description of Polonius. In other words, this thesis is by far the most complete
 account of Polonius design, implementation, and operation.
 
 \chapter{A Safe and Modern Systems Programming Language}\label{cha:background}
+\epigraph{Be wary, then. Best safety lies in fear.}%
+{Laertes, on strong type systems. \textit{Hamlet}, Act-I, Scene-III.}
+
 % Whenever a reference to a resource is created in Rust, its borrowing rules
 % described in Section~\ref{sec:borrowing-rules} must be respected for as long as
 % the reference is alive, including across function
@@ -438,7 +445,13 @@ fn parse<'buf>(_buffer: &'buf mut String) -> &'buf str {
 The other reason for Polonius is to more clearly capture the semantics of the
 borrow check in a domain-specific language.
 
-\chapter{The Borrow Check: Enforcing Rust's Memory Model}\label{cha:borrowing-rules}
+\chapter{The Borrow Check: Enforcing Rust's Memory
+  Model}\label{cha:borrowing-rules}
+
+\epigraph{Neither a borrower nor a lender be\\
+  For loan oft loses both itself and friend,\\
+  And borrowing dulls the edge of husbandry.}{Polonius in
+  \textit{Hamlet}, Act-I, Scene-III, Lines 75--77}
 
 In this chapter we will delve deeper into what the borrow check actually means.
 The idea is for the reader to develop an intuition for what it means in practice
@@ -936,6 +949,9 @@ the rest of the typing judgment. Equipped with this simpler rule, we now have
 enough understanding of the formal basis of Polonius to move forward with the
 actual implementation.
 \chapter{The Borrow Check in the Rust Compiler}\label{cha:borrow-check-compiler}
+\epigraph{Get thee to a nunnery, go. Farewell.}%
+{Hamlet offering me career advice after my work on this thesis. \textit{Hamlet},
+  Act-III, Scene-I}
 
 \begin{figure}[h!]
   \includegraphics[width=0.9\linewidth]{Graphs/rustc-overview}
@@ -1180,6 +1196,15 @@ Chapter~\ref{cha:implementation}.
 
 \chapter{Datafrog, a Datalog Embedded in Rust}\label{cha:datalog}
 
+\epigraph{My liege, and madam, to expostulate\\
+  What majesty should be, what duty is,\\
+  What day is day, night night, and time is time,\\
+  Were nothing but to waste night, day, and time;\\
+  Therefore, since brevity is the soul of wit,\\
+  And tediousness the limbs and outward flourishes,\\
+  I will be brief. Your noble son is mad ...}{Polonius, probably on using
+  Datafrog, in \textit{Hamlet}, Act-II, Scene-II}
+
 In this chapter, we will discuss Datalog, the language we use to express
 Polonius, and its implementation Datafrog. Datalog is a derivative of the logic
 programming language Prolog, with the desirable properties that any program
@@ -1359,6 +1384,10 @@ Rust''.\footnote{The experimental code to synthesise Datafrog rules can be found
 
 
 \chapter{Implementing Polonius}\label{cha:implementation}
+
+\epigraph{Why, then, 'tis none to you, for there is nothing either good or bad,
+  but thinking makes it so}%
+{\textit{Hamlet}, Act-II, Scene-II}
 
 In this chapter, we will describe the current implementation of Polonius in
 Datalog (forgetting the horrors of Datafrog in Section~\ref{sec:datalog}). We
@@ -1940,6 +1969,8 @@ drop(y);
 \section{Conclusion}\label{sec:implementation:conclusion}
 
 \chapter{A Field Study of Polonius Inputs}\label{sec:field-study-borrow}
+\epigraph{There are more things in heaven and earth, Horatio,\\
+  Than are dreamt of in your philosophy.}{\textit{Hamlet}, Act-I, Scene-V}
 
 We selected for analysis roughly 20 000~publicly available Rust packages
 (``crates'') from the most popular projects as defined by number of downloads
@@ -2156,6 +2187,9 @@ and input sizes of any kind (Table~\ref{tab:correlations}).
 \end{figure}
 
 \chapter{Conclusions and Future Work}\label{cha:conclusions}
+\epigraph{To sleep: perchance to dream: ay, there's the rub;\\
+  For in that sleep of death what dreams may come}%
+{\textit{Hamlet}, Act-III, Scene-I}
 
 Before Polonius can replace NLL as the Rust borrow checker, it would need
 considerable performance improvements in both its fact generation process as
