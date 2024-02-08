@@ -12,3 +12,5 @@
 *.toc
 /.DS_Store
 /auto
+/bibliography.log
+/_minted-*

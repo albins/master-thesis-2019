@@ -5,7 +5,7 @@ all: Thesis.pdf
 clean:
 	latexmk -CA
 
-Thesis.pdf: Thesis.tex ../bibliography.bib
+Thesis.pdf: Thesis.tex bibliography.bib
 	source activate $(PYGMENTS_VENV) \
 	&& latexmk \
 		-pdf \
@@ -16,3 +16,16 @@ Thesis.pdf: Thesis.tex ../bibliography.bib
     -interaction=nonstopmode \
     $< \
 	&& source deactivate
+
+.PHONY: diff
+diff:
+	git latexdiff \
+		--ignore-makefile \
+		--xelatex \
+		--biber \
+    --latexmk \
+	  --latexopt -shell-escape \
+    --verbose \
+	HEAD^
+
+

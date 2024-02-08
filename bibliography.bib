@@ -1,0 +1,247 @@
+@Misc{spa,
+  author =       {Anders M\o{}ller and Michael I. Schwartzbach},
+  title =        {Static Program Analysis},
+  year =         2018,
+  month =        {October},
+  note =         {Department of Computer Science, Aarhus University,
+                  \texttt{http://cs.au.dk/\~{}amoeller/spa/}},
+}
+
+
+@inproceedings{matsakis_rust_2014,
+	location = {New York, {NY}, {USA}},
+	title = {The Rust Language},
+	isbn = {978-1-4503-3217-0},
+	url = {http://doi.acm.org/10.1145/2663171.2663188},
+	doi = {10.1145/2663171.2663188},
+	series = {{HILT} '14},
+	abstract = {Rust is a new programming language for developing reliable and efficient systems. It is designed to support concurrency and parallelism in building applications and libraries that take full advantage of modern hardware. Rust's static type system is safe1 and expressive and provides strong guarantees about isolation, concurrency, and memory safety. Rust also offers a clear performance model, making it easier to predict and reason about program efficiency. One important way it accomplishes this is by allowing fine-grained control over memory representations, with direct support for stack allocation and contiguous record storage. The language balances such controls with the absolute requirement for safety: Rust's type system and runtime guarantee the absence of data races, buffer overflows, stack overflows, and accesses to uninitialized or deallocated memory.},
+	pages = {103--104},
+	booktitle = {Proceedings of the 2014 {ACM} {SIGAda} Annual Conference on High Integrity Language Technology},
+	publisher = {{ACM}},
+	author = {Matsakis, Nicholas D. and Klock, {II}, Felix S.},
+	urldate = {2019-03-29},
+	date = {2014},
+	note = {event-place: Portland, Oregon, {USA}},
+	keywords = {affine type systems, memory management, rust, systems programming},
+	file = {ACM Full Text PDF:/Users/albin/Zotero/storage/ZQDKCVPE/Matsakis and Klock - 2014 - The Rust Language.pdf:application/pdf}
+}
+
+@inproceedings{matsakis_time-aware_2010,
+	location = {New York, {NY}, {USA}},
+	title = {A Time-aware Type System for Data-race Protection and Guaranteed Initialization},
+	isbn = {978-1-4503-0203-6},
+	url = {http://doi.acm.org/10.1145/1869459.1869511},
+	doi = {10.1145/1869459.1869511},
+	series = {{OOPSLA} '10},
+	abstract = {We introduce a type system based on intervals, objects representing the time in which a block of code will execute. The type system can verify time-based properties such as when a field will be accessed or a method will be invoked. One concrete application of our type system is data-race protection: For fields which are initialized during one phase of the program and constant thereafter, users can designate the interval during which the field is mutable. Code which happens after this initialization interval can safely read the field in parallel. We also support fields guarded by a lock and even the use of dynamic race detectors. Another use for intervals is to designate different phases in the object's lifetime, such as a constructor phase. The type system then ensures that only appropriate methods are invoked in each phase.},
+	pages = {634--651},
+	booktitle = {Proceedings of the {ACM} International Conference on Object Oriented Programming Systems Languages and Applications},
+	publisher = {{ACM}},
+	author = {Matsakis, Nicholas D. and Gross, Thomas R.},
+	urldate = {2019-03-29},
+	date = {2010},
+	note = {event-place: Reno/Tahoe, Nevada, {USA}},
+	keywords = {data race, intervals, time-based properties, type systems},
+	file = {ACM Full Text PDF:/Users/albin/Zotero/storage/2B4PSB2B/Matsakis and Gross - 2010 - A Time-aware Type System for Data-race Protection .pdf:application/pdf}
+}
+
+@incollection{sagiv_chapter_1988,
+	title = {Chapter 17 - Optimizing {D}atalog Programs},
+	isbn = {978-0-934613-40-8},
+	url = {http://www.sciencedirect.com/science/article/pii/B978093461340850021X},
+		pages = {659--698},
+	booktitle = {Foundations of Deductive Databases and Logic Programming},
+	publisher = {Morgan Kaufmann},
+	author = {Sagiv, Yehoshua},
+	editor = {Minker, Jack},
+	urldate = {2019-03-29},
+	date = {1988-01-01},
+	doi = {10.1016/B978-0-934613-40-8.50021-X},
+	file = {ScienceDirect Snapshot:/Users/albin/Zotero/storage/EFQ5LFRV/B978093461340850021X.html:text/html}
+}
+
+@article{ceri_what_1989,
+	title = {What you always wanted to know about {D}atalog (and never dared to ask)},
+	volume = {1},
+	issn = {1041-4347},
+	doi = {10.1109/69.43410},
+	pages = {146--166},
+	number = {1},
+	journaltitle = {{IEEE} Transactions on Knowledge and Data Engineering},
+	author = {Ceri, S. and Gottlob, G. and Tanca, L.},
+	date = {1989-03},
+}
+
+@article{feder_computational_1998,
+	title = {The Computational Structure of Monotone Monadic {SNP} and Constraint Satisfaction: A Study through {D}atalog and {G}roup {T}heory},
+	volume = {28},
+	issn = {0097-5397},
+	url = {https://epubs.siam.org/doi/abs/10.1137/S0097539794266766},
+	doi = {10.1137/S0097539794266766},
+	shorttitle = {The Computational Structure of Monotone Monadic {SNP} and Constraint Satisfaction},
+	pages = {57--104},
+	number = {1},
+	journaltitle = {{SIAM} Journal on Computing},
+	shortjournal = {{SIAM} J. Comput.},
+	author = {Feder, T. and Vardi, M.},
+	urldate = {2019-03-29},
+	date = {1998-01-01},
+}
+
+@article{afrati_datalog_1995,
+	title = {On {D}atalog vs Polynomial Time},
+	volume = {51},
+	issn = {0022-0000},
+	url = {http://www.sciencedirect.com/science/article/pii/S0022000085710604},
+	doi = {10.1006/jcss.1995.1060},
+	pages = {177--196},
+	number = {2},
+	journaltitle = {Journal of Computer and System Sciences},
+	shortjournal = {Journal of Computer and System Sciences},
+	author = {Afrati, F. and Cosmadakis, S. S. and Yannakakis, M.},
+	urldate = {2019-03-29},
+	date = {1995-10-01},
+	file = {ScienceDirect Full Text PDF:/Users/albin/Zotero/storage/D8S3A4J3/Afrati et al. - 1995 - On Datalog vs Polynomial Time.pdf:application/pdf;ScienceDirect Snapshot:/Users/albin/Zotero/storage/VU5SZQSY/S0022000085710604.html:text/html}
+}
+
+@inproceedings{eiter_adding_1994,
+	location = {New York, {NY}, {USA}},
+	title = {Adding Disjunction to {D}atalog},
+	isbn = {978-0-89791-642-4},
+	url = {http://doi.acm.org/10.1145/182591.182639},
+	doi = {10.1145/182591.182639},
+	series = {{PODS} '94},
+	abstract = {We study the expressive power and complexity of disjunctive datalog, i.e., datalog with disjunctive rule heads, under three different semantics: the minimal model semantics, the perfect models semantics, and the stable model semantics. We show that the brave variants of these semantics express the same set of queries. In fact, they precisely capture the complexity of class \&Sgr;P/2. The combined complexity of disjunctive datalog is shown to be {NEXPTIMENP}-complete.},
+	pages = {267--278},
+	booktitle = {Proceedings of the Thirteenth {ACM} {SIGACT}-{SIGMOD}-{SIGART} Symposium on Principles of Database Systems},
+	publisher = {{ACM}},
+	author = {Eiter, Thomas and Gottlob, Georg and Mannila, Heikki},
+	urldate = {2019-03-29},
+	date = {1994},
+	note = {event-place: Minneapolis, Minnesota, {USA}},
+	file = {ACM Full Text PDF:/Users/albin/Zotero/storage/FBZHBM6B/Eiter et al. - 1994 - Adding Disjunction to Datalog (Extended Abstract).pdf:application/pdf}
+}
+
+@inproceedings{ngo_worst-case_2012,
+	title = {Worst-case optimal join algorithms},
+	pages = {37--48},
+	booktitle = {Proceedings of the 31st {ACM} {SIGMOD}-{SIGACT}-{SIGAI} symposium on Principles of Database Systems},
+	publisher = {{ACM}},
+	author = {Ngo, Hung Q. and Porat, Ely and Ré, Christopher and Rudra, Atri},
+	date = {2012},
+}
+
+@article{veldhuizen_leapfrog_2012,
+	title = {Leapfrog {T}riejoin: a worst-case optimal join algorithm},
+	url = {http://arxiv.org/abs/1210.0481},
+	shorttitle = {Leapfrog Triejoin},
+	abstract = {Recent years have seen exciting developments in join algorithms. In 2008, Atserias, Grohe and Marx (henceforth {AGM}) proved a tight bound on the maximum result size of a full conjunctive query, given constraints on the input relation sizes. In 2012, Ngo, Porat, R«e and Rudra (henceforth {NPRR}) devised a join algorithm with worst-case running time proportional to the {AGM} bound [8]. Our commercial database system {LogicBlox} employs a novel join algorithm, leapfrog triejoin, which compared conspicuously well to the {NPRR} algorithm in preliminary benchmarks. This spurred us to analyze the complexity of leapfrog triejoin. In this paper we establish that leapfrog triejoin is also worst-case optimal, up to a log factor, in the sense of {NPRR}. We improve on the results of {NPRR} by proving that leapfrog triejoin achieves worst-case optimality for ﬁner-grained classes of database instances, such as those deﬁned by constraints on projection cardinalities. We show that {NPRR} is not worstcase optimal for such classes, giving a counterexample where leapfrog triejoin runs in O(n log n) time and {NPRR} runs in Θ(n1.375) time. On a practical note, leapfrog triejoin can be implemented using conventional data structures such as B-trees, and extends naturally to ∃1 queries. We believe our algorithm offers a useful addition to the existing toolbox of join algorithms, being easy to absorb, simple to implement, and having a concise optimality proof.},
+	journaltitle = {{arXiv}:1210.0481 [cs]},
+	author = {Veldhuizen, Todd L.},
+	urldate = {2019-04-01},
+	date = {2012-10-01},
+	langid = {english},
+	eprinttype = {arxiv},
+	eprint = {1210.0481},
+	keywords = {Computer Science - Data Structures and Algorithms, Computer Science - Databases},
+	file = {Veldhuizen - 2012 - Leapfrog Triejoin a worst-case optimal join algor.pdf:/Users/albin/Zotero/storage/6ABSEVH4/Veldhuizen - 2012 - Leapfrog Triejoin a worst-case optimal join algor.pdf:application/pdf}
+}
+
+
+@online{nichols_rust_nodate,
+	title = {The {R}ust Programming Language},
+	url = {https://doc.rust-lang.org/book/foreword.html},
+  year = {2019},
+	author = {Nichols, Carol and Klabnik, Steve},
+	urldate = {2019-04-01},
+}
+
+
+@online{matsakis_alias-based_2018,
+	title = {An alias-based formulation of the borrow checker},
+	url = {http://smallcultfollowing.com/babysteps/blog/2018/04/27/an-alias-based-formulation-of-the-borrow-checker/},
+	titleaddon = {Baby Steps},
+	author = {Matsakis, Nicholas D.},
+	urldate = {2019-04-01},
+	date = {2018-04-27},
+	file = {An alias-based formulation of the borrow checker:/Users/albin/Zotero/storage/IFTUS982/an-alias-based-formulation-of-the-borrow-checker.html:text/html}
+}
+
+@online{matsakis_polonius_2019,
+	title = {Polonius and the case of the hereditary harrop predicate},
+	url = {http://smallcultfollowing.com/babysteps/blog/2019/01/21/hereditary-harrop-region-constraints/},
+	titleaddon = {Baby Steps},
+	author = {Matsakis, Nicholas D.},
+	urldate = {2019-04-01},
+	date = {2019-01-21},
+	file = {Polonius and the case of the hereditary harrop predicate:/Users/albin/Zotero/storage/G369PPFT/hereditary-harrop-region-constraints.html:text/html}
+}
+
+@online{matsakis_polonius_2019-1,
+	title = {Polonius and region errors},
+	url = {http://smallcultfollowing.com/babysteps/blog/2019/01/17/polonius-and-region-errors/},
+	titleaddon = {Baby Steps},
+	author = {Matsakis, Nicholas D.},
+	urldate = {2019-04-01},
+	date = {2019-01-17},
+	file = {Polonius and region errors:/Users/albin/Zotero/storage/I3QTXE8K/polonius-and-region-errors.html:text/html}
+}
+
+@online{matsakis_after_2018,
+	title = {After {NLL}: Interprocedural conflicts},
+	url = {http://smallcultfollowing.com/babysteps/blog/2018/11/01/after-nll-interprocedural-conflicts/},
+	author = {Matsakis, Nicholas D.},
+	urldate = {2019-04-01},
+	date = {2018-11-01},
+	file = {After NLL\: Interprocedural conflicts:/Users/albin/Zotero/storage/7HAFYX6N/after-nll-interprocedural-conflicts.html:text/html}
+}
+
+
+@misc{noauthor_rfc_2019,
+	title = {{RFC} 2094: Non-lexical Lifetimes},
+	url = {https://github.com/rust-lang/rfcs},
+	publisher = {The Rust Programming Language},
+	urldate = {2019-04-01},
+	date = {2019-04-01},
+	note = {original-date: 2014-03-07T21:29:00Z}
+}
+
+
+@software{datafrog,
+	title = {Datafrog: a lightweight Datalog engine in Rust},
+	url = {https://github.com/rust-lang/datafrog},
+	publisher = {The Rust Programming Language},
+	urldate = {2019-04-01},
+	date = {2019-03-29},
+}
+
+@software{rustc-perf,
+	title = {rustc-perf},
+	url = {https://github.com/rust-lang-nursery/rustc-perf},
+	publisher = {rust-lang-nursery},
+	urldate = {2019-04-01},
+	date = {2019-03-26},
+}
+
+
+@inproceedings{scholz_fast_2016,
+	title = {On fast large-scale program analysis in datalog},
+	pages = {196--206},
+	booktitle = {Proceedings of the 25th International Conference on Compiler Construction},
+	publisher = {{ACM}},
+	author = {Scholz, Bernhard and Jordan, Herbert and Subotić, Pavle and Westmann, Till},
+	date = {2016},
+	file = {Full Text:/Users/albin/Zotero/storage/9ABUVPYN/Scholz et al. - 2016 - On fast large-scale program analysis in datalog.pdf:application/pdf;Snapshot:/Users/albin/Zotero/storage/X5ZHDPD3/citation.html:text/html}
+}
+
+
+@article{weiss_oxide:_2019,
+	title = {Oxide: The Essence of Rust},
+	url = {https://arxiv.org/abs/1903.00982v1},
+	shorttitle = {Oxide},
+	author = {Weiss, Aaron and Patterson, Daniel and Matsakis, Nicholas D. and Ahmed, Amal},
+	urldate = {2019-04-21},
+	date = {2019-03-03},
+	langid = {english},
+}
