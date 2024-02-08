@@ -136,8 +136,7 @@
 
 \newcommand{\ntyperule}[2]{\begin{array}{c}#1\\\hline\raisebox{1pt}{\strut}#2\end{array}}
 
-\title{A Dataflow Approach to Reference Ownership Analysis for the Rust
-  Programming Language}
+\title{Modelling Rust's Reference Ownership Analysis Declaratively in Datalog}
 
 \begin{document}
 % %\frontmatter*
@@ -206,6 +205,8 @@ language treats the scope of a reference, called its lifetime, as part of its
 type, and also provides facilities for the programmer to name and reason about
 them as they would any other type.
 
+% similar but different to Region-based memory
+
 Since its release, the Rust compiler has been extended through proposal RFC~2094
 to add support for so-called non-lexical lifetimes (NLLs), allowing the compiler
 to calculate lifetimes of references based on the control-flow graph rather than
@@ -217,23 +218,32 @@ allow for a more advanced analysis while also allowing for better compile-time
 performance through the advances done centrally to the fixpoint solving provided
 by the Datalog engine used for the computations~\cite{datafrog}.
 
-Datalog has been previously employed for program analysis, including in the
-Souffl{\'e} system, which is used to synthesise performant C++ from Datalog
-specifications, showing promising performance for analysis of large
-programs~\cite{scholz_fast_2016}.
+Datalog, and other types of logic programming has been previously employed for
+program analysis, in particular pointer analyses such as may-point-to and
+must-point-to analysis, both similar to what is described in this report in that
+they require fix-point solving and graph traversal, often with a context
+sensitive analysis
+\cite{Dawson:1996:PPA:231379.231399,Berndl:2003:PAU:780822.781144,hajiyev_codequest:_2005,Whaley:2004:CCP:996893.996859,lam_context-sensitive_2005,Benton:2007:ISD:1273920.1273923,Hardekopf:2007:AGF:1250734.1250767,Smaragdakis:2011:PYC:1926385.1926390,smaragdakis_using_2010,balatsouras_datalog_2017,
+  Madsen:2016:DFD:2908080.2908096}. These systems employ a wide variety of
+solver technologies and storage back-ends for fact handling, from Binary
+Decision Diagrams (BDDs) to explicit tuple storage, as used in this study. Some
+of them, like Flix, also extends Datalog specifically for static program
+analysis\cite{Madsen:2016:DFD:2908080.2908096}.
+
+A \citeyear{scholz_fast_2016}~study uses the Souffl{\'e} system, which
+synthesizes performant C++ code from the Datalog specifications, similar to how
+Datafrog embeds a minimal solver as a Rust library, to show promising
+performance for analysis of large programs~\cite{scholz_fast_2016}. The
+\textsc{Doop} system, developed by \citeauthor{smaragdakis_using_2010}, also
+shows that explicit tuple storage sometimes vastly outperforms
+BDDs~\cite{smaragdakis_using_2010}.
 
 Formally, the semantics of Rust's lifetime rules has been captured in the
 language Oxide, described by
-\citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
+\citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}
 
-% describe what others have done
-% describe what was already there
-% describe rvalues???
+% FIXME describe what was already there when I came
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
-
-% FIXME: show where in the compiling process Polonius fits
-
-
 Most of these examples are borrowed from
 \citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 
@@ -307,9 +317,20 @@ The logic of the borrow check as described in
 Section~\ref{sec:reference-provenance} is calculated at the level of an
 intermediate representation of Rust called the Mid-Level Intermediate
 Representation (MIR), corresponding to the basic blocks of program control flow.
-\fixme{Describe what this means in terms of desugaring etc?}
+The input data to the Polonius solver (called ``facts'') is generated in the
+Rust compiler by analysing this intermediate representation. This means that we
+can safely assume to be working with simple variable-value assignment
+expressions, of the type \InRust{_1 = _2}.
 
-\fixme{Describe Prefix Rules}
+\fixme{Rust uses \emph{supporting prefixes} to refer to the parts of a variable
+  access path touched by a dereferencing in the MIR~\cite{noauthor_rfc_2019}.
+  This becomes important when determining which parts of a reference to consider
+  under borrowing constraints. For example, given a tuple with a reference
+  \InRust{r: (&(i32, i64), (f32, f64))}, the path \InRust{(*r.0).1} has type
+  \InRust{i64} and the supporting prefixes \InRust{(*r.0).1} and \InRust{*r.0}
+  (\InRust{*} has a low precedence and so it \InRust{*r.0} is the same as
+  \InRust{*(r.0)}). Similarly, the path \InRust{r.1.0} has the supporting
+  prefixes \InRust{r.1.0}, \InRust{r.1}, and \InRust{r}}.
 
 \section{From Lifetimes to Reference Provenance}
 \label{sec:reference-provenance}
@@ -379,11 +400,11 @@ Rust provides a default deallocator for data structures, but it can be
 overridden. This has repercussions on liveness calculations, because while the
 default deallocator for an object never needs to access its fields, a custom
 deallocator might access any of them. This means that any conditions of a loan
-that resulted in a reference $r$ stored in a \InRust{struct} instance $a$ must
-only be respected as far as \InRust{a.drop()} is concerned if $s$ implements a
-custom deallocator. If it does not, the loan of $r$ may be safely violated, as
-the default deallocator never dereferences $r$ and thus doesn't require $r$ to
-be valid. An illustration of this can be seen in
+that resulted in a reference $r$ stored in a \InRust{struct} $s$ instance $a$
+must only be respected as far as \InRust{a.drop()} is concerned if $s$
+implements a custom deallocator. Otherwise the loan of $r$ may be safely
+violated, as the default deallocator never dereferences $r$ and thus doesn't
+require $r$ to be valid. An illustration of this can be seen in
 Listing~\ref{lst:drop-liveness}.
 
 \begin{sourcecode}
@@ -424,7 +445,7 @@ fn main() {
 \end{minted}
 \end{sourcecode}
 
-\section{Datalog}
+\section{Datalog and Datafrog}
 \label{sec:datalog}
 
 \fixme{Describe datalog's syntax and execution model.}
@@ -436,18 +457,14 @@ fn main() {
 
 \section{The Borrow Checker in Datalog}
 
-% input facts
-% datalog rules
-% their implementation in Datafrog
-
 \subsection{Starting Facts}
 \label{sec:input-facts}
 \fixme{Verify the terminology for this in Datalog parlance!}
 
 \begin{description}
 \item[\InDatalog{borrow_region(R, B, P)}] the region $R$ may refer to data from
-  borrow $B$ starting at the point $P$ (this is usually the point \emph{after} a
-  borrow rvalue).
+  borrow $B$ starting at the point $P$ (this is usually the point \emph{after}
+  the right-hand-side of a borrow expression).
   
 \item[\InDatalog{universal_region(R)}] this is a "free region" within fn body
   \fixme{what the heck is a free region}
