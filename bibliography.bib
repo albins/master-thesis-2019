@@ -10,12 +10,11 @@
 
 @inproceedings{matsakis_rust_2014,
 	location = {New York, {NY}, {USA}},
-	title = {The Rust Language},
+	title = {The {R}ust Language},
 	isbn = {978-1-4503-3217-0},
-	url = {http://doi.acm.org/10.1145/2663171.2663188},
 	doi = {10.1145/2663171.2663188},
 	series = {{HILT} '14},
-	abstract = {Rust is a new programming language for developing reliable and efficient systems. It is designed to support concurrency and parallelism in building applications and libraries that take full advantage of modern hardware. Rust's static type system is safe1 and expressive and provides strong guarantees about isolation, concurrency, and memory safety. Rust also offers a clear performance model, making it easier to predict and reason about program efficiency. One important way it accomplishes this is by allowing fine-grained control over memory representations, with direct support for stack allocation and contiguous record storage. The language balances such controls with the absolute requirement for safety: Rust's type system and runtime guarantee the absence of data races, buffer overflows, stack overflows, and accesses to uninitialized or deallocated memory.},
+	abstract = {{R}ust is a new programming language for developing reliable and efficient systems. It is designed to support concurrency and parallelism in building applications and libraries that take full advantage of modern hardware. {R}ust's static type system is safe1 and expressive and provides strong guarantees about isolation, concurrency, and memory safety. {R}ust also offers a clear performance model, making it easier to predict and reason about program efficiency. One important way it accomplishes this is by allowing fine-grained control over memory representations, with direct support for stack allocation and contiguous record storage. The language balances such controls with the absolute requirement for safety: {R}ust's type system and runtime guarantee the absence of data races, buffer overflows, stack overflows, and accesses to uninitialized or deallocated memory.},
 	pages = {103--104},
 	booktitle = {Proceedings of the 2014 {ACM} {SIGAda} Annual Conference on High Integrity Language Technology},
 	publisher = {{ACM}},
@@ -24,14 +23,13 @@
 	date = {2014},
 	note = {event-place: Portland, Oregon, {USA}},
 	keywords = {affine type systems, memory management, rust, systems programming},
-	file = {ACM Full Text PDF:/Users/albin/Zotero/storage/ZQDKCVPE/Matsakis and Klock - 2014 - The Rust Language.pdf:application/pdf}
+	file = {ACM Full Text PDF:/Users/albin/Zotero/storage/ZQDKCVPE/Matsakis and Klock - 2014 - The {R}ust Language.pdf:application/pdf}
 }
 
 @inproceedings{matsakis_time-aware_2010,
 	location = {New York, {NY}, {USA}},
 	title = {A Time-aware Type System for Data-race Protection and Guaranteed Initialization},
 	isbn = {978-1-4503-0203-6},
-	url = {http://doi.acm.org/10.1145/1869459.1869511},
 	doi = {10.1145/1869459.1869511},
 	series = {{OOPSLA} '10},
 	abstract = {We introduce a type system based on intervals, objects representing the time in which a block of code will execute. The type system can verify time-based properties such as when a field will be accessed or a method will be invoked. One concrete application of our type system is data-race protection: For fields which are initialized during one phase of the program and constant thereafter, users can designate the interval during which the field is mutable. Code which happens after this initialization interval can safely read the field in parallel. We also support fields guarded by a lock and even the use of dynamic race detectors. Another use for intervals is to designate different phases in the object's lifetime, such as a constructor phase. The type system then ensures that only appropriate methods are invoked in each phase.},
@@ -49,8 +47,7 @@
 @incollection{sagiv_chapter_1988,
 	title = {Chapter 17 - Optimizing {D}atalog Programs},
 	isbn = {978-0-934613-40-8},
-	url = {http://www.sciencedirect.com/science/article/pii/B978093461340850021X},
-		pages = {659--698},
+	pages = {659--698},
 	booktitle = {Foundations of Deductive Databases and Logic Programming},
 	publisher = {Morgan Kaufmann},
 	author = {Sagiv, Yehoshua},
@@ -77,7 +74,6 @@
 	title = {The Computational Structure of Monotone Monadic {SNP} and Constraint Satisfaction: A Study through {D}atalog and {G}roup {T}heory},
 	volume = {28},
 	issn = {0097-5397},
-	url = {https://epubs.siam.org/doi/abs/10.1137/S0097539794266766},
 	doi = {10.1137/S0097539794266766},
 	shorttitle = {The Computational Structure of Monotone Monadic {SNP} and Constraint Satisfaction},
 	pages = {57--104},
@@ -93,7 +89,6 @@
 	title = {On {D}atalog vs Polynomial Time},
 	volume = {51},
 	issn = {0022-0000},
-	url = {http://www.sciencedirect.com/science/article/pii/S0022000085710604},
 	doi = {10.1006/jcss.1995.1060},
 	pages = {177--196},
 	number = {2},
@@ -102,14 +97,13 @@
 	author = {Afrati, F. and Cosmadakis, S. S. and Yannakakis, M.},
 	urldate = {2019-03-29},
 	date = {1995-10-01},
-	file = {ScienceDirect Full Text PDF:/Users/albin/Zotero/storage/D8S3A4J3/Afrati et al. - 1995 - On Datalog vs Polynomial Time.pdf:application/pdf;ScienceDirect Snapshot:/Users/albin/Zotero/storage/VU5SZQSY/S0022000085710604.html:text/html}
+	file = {ScienceDirect Full Text PDF:/Users/albin/Zotero/storage/D8S3A4J3/Afrati et al. - 1995 - On {D}atalog vs Polynomial Time.pdf:application/pdf;ScienceDirect Snapshot:/Users/albin/Zotero/storage/VU5SZQSY/S0022000085710604.html:text/html}
 }
 
 @inproceedings{eiter_adding_1994,
 	location = {New York, {NY}, {USA}},
 	title = {Adding Disjunction to {D}atalog},
 	isbn = {978-0-89791-642-4},
-	url = {http://doi.acm.org/10.1145/182591.182639},
 	doi = {10.1145/182591.182639},
 	series = {{PODS} '94},
 	abstract = {We study the expressive power and complexity of disjunctive datalog, i.e., datalog with disjunctive rule heads, under three different semantics: the minimal model semantics, the perfect models semantics, and the stable model semantics. We show that the brave variants of these semantics express the same set of queries. In fact, they precisely capture the complexity of class \&Sgr;P/2. The combined complexity of disjunctive datalog is shown to be {NEXPTIMENP}-complete.},
@@ -120,7 +114,7 @@
 	urldate = {2019-03-29},
 	date = {1994},
 	note = {event-place: Minneapolis, Minnesota, {USA}},
-	file = {ACM Full Text PDF:/Users/albin/Zotero/storage/FBZHBM6B/Eiter et al. - 1994 - Adding Disjunction to Datalog (Extended Abstract).pdf:application/pdf}
+	file = {ACM Full Text PDF:/Users/albin/Zotero/storage/FBZHBM6B/Eiter et al. - 1994 - Adding Disjunction to {D}atalog (Extended Abstract).pdf:application/pdf}
 }
 
 @inproceedings{ngo_worst-case_2012,
@@ -200,7 +194,7 @@
 @misc{noauthor_rfc_2019,
 	title = {{RFC} 2094: Non-lexical Lifetimes},
 	url = {https://github.com/rust-lang/rfcs},
-	publisher = {The Rust Programming Language},
+	publisher = {The {R}ust Programming Language},
 	urldate = {2019-04-01},
 	date = {2019-04-01},
 	note = {original-date: 2014-03-07T21:29:00Z}
@@ -208,9 +202,9 @@
 
 
 @software{datafrog,
-	title = {Datafrog: a lightweight Datalog engine in Rust},
+	title = {Datafrog: a lightweight {D}atalog engine in {R}ust},
 	url = {https://github.com/rust-lang/datafrog},
-	publisher = {The Rust Programming Language},
+	publisher = {The {R}ust Programming Language},
 	urldate = {2019-04-01},
 	date = {2019-03-29},
 }
@@ -236,7 +230,7 @@
 
 
 @article{weiss_oxide:_2019,
-	title = {Oxide: The Essence of Rust},
+	title = {Oxide: The Essence of {R}ust},
 	url = {https://arxiv.org/abs/1903.00982v1},
 	shorttitle = {Oxide},
 	author = {Weiss, Aaron and Patterson, Daniel and Matsakis, Nicholas D. and Ahmed, Amal},
@@ -247,7 +241,7 @@
 
 @article{Madsen:2016:DFD:2980983.2908096,
  author = {Madsen, Magnus and Yee, Ming-Ho and Lhot\'{a}k, Ond\v{r}ej},
- title = {From Datalog to {F}lix: A Declarative Language for Fixed Points on Lattices},
+ title = {From {D}atalog to {F}lix: A Declarative Language for Fixed Points on Lattices},
  journal = {SIGPLAN Not.},
  issue_date = {June 2016},
  volume = 51,
@@ -257,12 +251,11 @@
  issn = {0362-1340},
  pages = {194--208},
  numpages = 15,
- url = {http://doi.acm.org/10.1145/2980983.2908096},
  doi = {10.1145/2980983.2908096},
  acmid = 2908096,
  publisher = {ACM},
  address = {New York, NY, USA},
- keywords = {Datalog, logic programming, static analysis},
+ keywords = {{D}atalog, logic programming, static analysis},
 }
 
 @inproceedings{Benton:2007:ISD:1273920.1273923,
@@ -275,7 +268,6 @@
  location = {Wroclaw, Poland},
  pages = {13--24},
  numpages = {12},
- url = {http://doi.acm.org/10.1145/1273920.1273923},
  doi = {10.1145/1273920.1273923},
  acmid = {1273923},
  publisher = {ACM},
@@ -295,12 +287,11 @@
  issn = {0362-1340},
  pages = {131--144},
  numpages = {14},
- url = {http://doi.acm.org/10.1145/996893.996859},
  doi = {10.1145/996893.996859},
  acmid = {996859},
  publisher = {ACM},
  address = {New York, NY, USA},
- keywords = {Datalog, Java, binary decision diagrams, cloning, context-sensitive, inclusion-based, logic programming, pointer analysis, program analysis, scalable},
+ keywords = {{D}atalog, Java, binary decision diagrams, cloning, context-sensitive, inclusion-based, logic programming, pointer analysis, program analysis, scalable},
 }
 
 @inproceedings{Smaragdakis:2011:PYC:1926385.1926390,
@@ -313,7 +304,6 @@
  location = {Austin, Texas, USA},
  pages = {17--30},
  numpages = 14,
- url = {http://doi.acm.org/10.1145/1926385.1926390},
  doi = {10.1145/1926385.1926390},
  acmid = 1926390,
  publisher = {ACM},
@@ -333,7 +323,6 @@
  issn = {0362-1340},
  pages = {103--114},
  numpages = 12,
- url = {http://doi.acm.org.ezproxy.its.uu.se/10.1145/780822.781144},
  doi = {10.1145/780822.781144},
  acmid = 781144,
  publisher = {ACM},
@@ -351,7 +340,6 @@
  location = {Philadelphia, Pennsylvania, USA},
  pages = {117--126},
  numpages = 10,
- url = {http://doi.acm.org.ezproxy.its.uu.se/10.1145/231379.231399},
  doi = {10.1145/231379.231399},
  acmid = 231399,
  publisher = {ACM},
@@ -368,7 +356,6 @@
  location = {Leipzig, Germany},
  pages = {391--400},
  numpages = {10},
- url = {http://doi.acm.org.ezproxy.its.uu.se/10.1145/1368088.1368142},
  doi = {10.1145/1368088.1368142},
  acmid = {1368142},
  publisher = {ACM},
@@ -386,7 +373,6 @@
  location = {San Diego, California, USA},
  pages = {290--299},
  numpages = {10},
- url = {http://doi.acm.org.ezproxy.its.uu.se/10.1145/1250734.1250767},
  doi = {10.1145/1250734.1250767},
  acmid = {1250767},
  publisher = {ACM},
@@ -404,7 +390,6 @@
  location = {Savannah, GA, USA},
  pages = {226--238},
  numpages = {13},
- url = {http://doi.acm.org.ezproxy.its.uu.se/10.1145/1480881.1480911},
  doi = {10.1145/1480881.1480911},
  acmid = {1480911},
  publisher = {ACM},
@@ -437,30 +422,30 @@
 
 
 @inproceedings{smaragdakis_using_2010,
-	title = {Using Datalog for fast and easy program analysis},
+	title = {Using {D}atalog for fast and easy program analysis},
 	pages = {245--251},
-	booktitle = {International Datalog 2.0 Workshop},
+	booktitle = {International {D}atalog 2.0 Workshop},
 	publisher = {Springer},
 	author = {Smaragdakis, Yannis and Bravenboer, Martin},
 	date = {2010},
 	keywords = {read},
-	file = {Full Text:/Users/albin/Zotero/storage/7YUVMFU7/Smaragdakis and Bravenboer - 2010 - Using Datalog for fast and easy program analysis.pdf:application/pdf;Snapshot:/Users/albin/Zotero/storage/LHAPYWFC/978-3-642-24206-9_14.html:text/html}
+	file = {Full Text:/Users/albin/Zotero/storage/7YUVMFU7/Smaragdakis and Bravenboer - 2010 - Using {D}atalog for fast and easy program analysis.pdf:application/pdf;Snapshot:/Users/albin/Zotero/storage/LHAPYWFC/978-3-642-24206-9_14.html:text/html}
 }
 
 
 @inproceedings{balatsouras_datalog_2017,
-	title = {A Datalog model of must-alias analysis},
+	title = {A {D}atalog model of must-alias analysis},
 	pages = {7--12},
 	booktitle = {Proceedings of the 6th {ACM} {SIGPLAN} International Workshop on State Of the Art in Program Analysis},
 	publisher = {{ACM}},
 	author = {Balatsouras, George and Ferles, Kostas and Kastrinis, George and Smaragdakis, Yannis},
 	date = {2017},
-	file = {Full Text:/Users/albin/Zotero/storage/766BMVE5/Balatsouras et al. - 2017 - A Datalog model of must-alias analysis.pdf:application/pdf}
+	file = {Full Text:/Users/albin/Zotero/storage/766BMVE5/Balatsouras et al. - 2017 - A {D}atalog model of must-alias analysis.pdf:application/pdf}
 }
 
 @inproceedings{Madsen:2016:DFD:2908080.2908096,
  author = {Madsen, Magnus and Yee, Ming-Ho and Lhot\'{a}k, Ond\v{r}ej},
- title = {From Datalog to Flix: A Declarative Language for Fixed Points on Lattices},
+ title = {From {D}atalog to {F}lix: A Declarative Language for Fixed Points on Lattices},
  booktitle = {Proceedings of the 37th ACM SIGPLAN Conference on Programming Language Design and Implementation},
  series = {PLDI '16},
  year = {2016},
@@ -468,17 +453,16 @@
  location = {Santa Barbara, CA, USA},
  pages = {194--208},
  numpages = {15},
- url = {http://doi.acm.org.ezproxy.its.uu.se/10.1145/2908080.2908096},
  doi = {10.1145/2908080.2908096},
  acmid = {2908096},
  publisher = {ACM},
  address = {New York, NY, USA},
- keywords = {Datalog, logic programming, static analysis},
+ keywords = {{D}atalog, logic programming, static analysis},
 }
 
 @misc{wiki:datalog,
     author = "{Wikipedia contributors}",
-    title = "Datalog --- {Wikipedia}{,} The Free Encyclopedia",
+    title = "{D}atalog --- {Wikipedia}{,} The Free Encyclopedia",
     year = "2019",
     howpublished = "\url{https://en.wikipedia.org/w/index.php?title=Datalog&oldid=899388108}",
     note = "[Online; accessed 1-June-2019]"
@@ -500,17 +484,18 @@
 @misc{mir_rfc,
 	title = {{RFC} 1211: Mid-level {IR} ({MIR})},
 	url = {http://rust-lang.github.io/rfcs/1211-mir.html},
-	publisher = {The Rust Programming Language},
+	publisher = {The {R}ust Programming Language},
 	urldate = {2019-04-01},
 	date = {2015-08-14},
 }
 
 
 @online{rustc_developers_guide_nodate,
-	title = {Guide to Rustc Development},
+	title = {Guide to {R}ustc Development},
 	url = {https://rust-lang.github.io/rustc-guide/},
 	author = {{Rustc developers}},
-	urldate = {2019-07-17}
+	date = {2019-07-17},
+  urldate = {2019-07-17}
 }
 
 @article{haraway,
