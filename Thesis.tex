@@ -332,6 +332,42 @@ Polonius is discussed further in Section~\ref{sec:type-system}.
 
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
 
+
+\begin{tabular}{p{0.18\textwidth} p{0.41\textwidth} p{0.41\textwidth}}
+  Rule & Positive Example & Negative Example \\ \hline
+  Use-Init&
+  \begin{minipage}[t]{0.41\textwidth}
+    \begin{minted}[autogobble]{rust}
+     let x: u32;
+
+     if random() {
+         x = 17;
+     } else {
+         x = 18;
+     }
+
+     let y = x + 1;
+    \end{minted}
+  \end{minipage}&
+  \begin{minipage}[t]{0.41\textwidth}
+    \begin{minted}[escapeinside=||, autogobble]{rust}
+     let x: u32;
+
+     if random() {
+         x = 17;
+     }
+
+     // ERROR: x not initialized:
+     let y = |\colorbox{red}{x}| + 1; 
+    \end{minted}
+  \end{minipage} \\
+  Move-Deinit & EXAMPLE & EXAMPLE \\
+  Shared-Read & EXAMPLE & EXAMPLE \\
+  Unique-Write & EXAMPLE & EXAMPLE
+  
+\end{tabular}
+% FIXME: better error colours!
+
 Conceptually, the borrow check verifies that Rust's ownership rules of shared
 memory are respected. Memory is owned by the scope (typically a function, block,
 or data structure) that has allocated it, and will be deallocated upon leaving
