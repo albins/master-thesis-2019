@@ -156,6 +156,8 @@
    \vspace{\baselineskip}
 \par}
 
+\renewcommand\_{\textunderscore\allowbreak}
+
 \begin{document}
 
 % %\frontmatter*
@@ -282,17 +284,16 @@ guarantees with the predictable performance and pay-as-you-go abstractions of
 systems languages like C++. Particular attention is given to protection against
 data races in concurrent programs through control of aliased memory.
 
-One of Rust's core features is the memory ownership model, which gives
-compile-time safety guarantees against access to uninitialised memory and data
-races in addition to enabling runtime-free automatic memory management. This
-model is enforced by a special type verification step during Rust compilation
-called the borrow check. The borrow check ensures that no memory access reaches
-uninitialised memory, and that any shared memory is only shared immutably.
-Finally, it also protects against dangling references and references to
-stack-allocated memory that may be outside of the scope of an accessor. The
-rules of the memory ownership model are discussed at a higher level in
-Chapter~\ref{cha:borrowing-rules}, and related to the experimental formal type
-system Oxide in Section~\ref{sec:type-system}.
+One of Rust's core features is its memory ownership model, which gives safety
+guarantees against access to uninitialised memory and data races in addition to
+enabling runtime-free automatic memory management. This model is enforced by a
+special type verification step during Rust compilation called the borrow check.
+The borrow check ensures that no memory access reaches uninitialised memory, and
+that any shared memory is only shared immutably. Finally, it also protects
+against dangling references and references to stack-allocated memory that may be
+outside of the scope of an accessor. The rules of the memory ownership model are
+discussed at a higher level in Chapter~\ref{cha:borrowing-rules}, and related to
+the experimental formal type system Oxide in Section~\ref{sec:type-system}.
 
 However, these rules represent a trade-off between static provability and
 expressive power. There exist several desirable Rust patterns, such as the
@@ -679,8 +680,8 @@ operations they can allow or deny.
 \section{Polonius: From Lifetimes to Provenance
   Variables}\label{sec:reference-provenance}
 
-The current borrow checker, NLL, treats the type of a reference, for example
-\InRust{&'db Database}, as a pair of values: a \textit{(named) lifetime}
+The current borrow checker, NLL, treats a reference type such as
+\InRust{&'db Database} as a pair of values: a \textit{(named) lifetime}
 (\InRust{'db}), and a type of the referent (\InRust{Database}). This type should
 be read as ``a \InRust{Database} that lives for at least \InRust{'db}''.
 Lifetimes are not always explicit and named like in the example; often they are
@@ -747,7 +748,7 @@ let p: &'a i32 = if random() {
 If a reference is used in an assignment like \InRust{let p: &'b i32 = &'a x},
 the reference, \InRust{p}, cannot outlive the referenced value, \InRust{x}. More
 formally the type of the right-hand side, \InRust{&'a i32}, must be a subtype of
-the left-hand side's type; \InRust{&'a i32 <: &'b i32}. In practice, this
+the left-hand side's; \InRust{&'a i32 <: &'b i32}. In practice, this
 establishes that \InRust{'b} lives at most as long as \InRust{'a}, which means
 that the subtyping rules for variables establishes a set membership constraint
 between their provenance variables, as seen in Rule~\ref{eq:s-ref} of
@@ -1173,9 +1174,9 @@ atoms used in Polonius can be found in Table~\ref{tab:input-atoms}.
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
 \begin{tabular}{@{}l l@{} l@{} @{}l@{}}
-  Fact & Code Example & Resulting Tuple(s) & Used \\ \toprule
-  \InDatalog{borrow_region(R, L, P)}\notmine{} & \InRust{bb0[0]}: \InRust{_1 = &1;}&
-                                                                           \InRust{('a, &1, Mid(bb0[0]))} & Bck  \\
+  Fact & Code Example & Resulting Tuple(s) & In \\ \toprule
+  \InDatalog{brrw_rgn(R, L, P)}\notmine{} & \InRust{bb0[0]}: \InRust{_1 = &1;}&
+                                                                           \InRust{('a, &1, M(bb0[0]))} & Bck  \\
   \InDatalog{universal_region(R)}\notmine{} & \InRust{fn f<'b>(x: &'b str)} & \InRust{('b)} & Bck \\
   \InDatalog{cfg_edge(P, Q)}\notmine{} &
                                \begin{tabular}[t]{@{}l l@{}}
@@ -1184,9 +1185,9 @@ atoms used in Polonius can be found in Table~\ref{tab:input-atoms}.
                                \end{tabular}
                       &
                         \begin{tabular}[t]{@{}l}
-                        \InRust{(Start(bb0[0]), Mid(bb0[0]))},\\
-                        \InRust{(Mid(bb0[0]), Start(bb0[1]))},\\
-                        \InRust{(Start(bb0[1]), Mid(bb0[1]))}\\
+                        \InRust{(S(bb0[0]), M(bb0[0]))},\\
+                        \InRust{(M(bb0[0]), S(bb0[1]))},\\
+                        \InRust{(S(bb0[1]), M(bb0[1]))}\\
                         \end{tabular}
                         & All \\
   \InDatalog{killed(L, P)}\notmine{} &
@@ -1195,26 +1196,26 @@ atoms used in Polonius can be found in Table~\ref{tab:input-atoms}.
                                \InRust{bb0[1]}: &\InRust{_3 = &_2;}
                              \end{tabular}                                                    
                       &
-                        \InRust{(&_1, Mid(bb0[1]))}
+                        \InRust{(&_1, M(bb0[1]))}
                                            & Bck \\
   \InDatalog{outlives(R1, R2, P)}\notmine{} &
                                     \InRust{bb0[0]}: \InRust{p: &'p i32 = &'x x;}
-                                     & \InRust{('x, 'p, Mid(bb0[0]))} & Bck \\
+                                     & \InRust{('x, 'p, M(bb0[0]))} & Bck \\
   \InDatalog{invalidates(P, L)}\notmine{} &
                                   \begin{tabular}[t]{@{}l l@{}}
                                     \InRust{bb0[0]}: & \InRust{_2 = &_1;} \\
                                     \InRust{bb0[1]}: & \InRust{_1 = 3;}
                                   \end{tabular}
-                      & \InRust{(Mid(bb0[1]), &_1)} & Bck  \\
-  \InDatalog{var_used(V, P)} & \InRust{bb0[0]}: \InRust{x + 1} & \InRust{(x, Mid(bb0[0]))} & Lvs  \\
-  \InDatalog{var_defined(V, P)} & \InRust{bb0[0]}: \InRust{x = 7} & \InRust{(x, Mid(bb0[0]))} & Lvs  \\
-  \InDatalog{var_drop_used(V, P)} & \InRust{bb0[0]}: \InRust{drop(x)} & \InRust{(x, Mid(bb0[0]))} & Lvs  \\
-  \InDatalog{var_uses_region(V, R)} & \InRust{let x: &'x i32;} & \InRust{(x, 'x)} & Lvs  \\
-  \InDatalog{var_drops_region(V, R)} &
+                      & \InRust{(M(bb0[1]), &_1)} & Bck  \\
+  \InDatalog{var_used(V, P)} & \InRust{bb0[0]}: \InRust{x + 1} & \InRust{(x, M(bb0[0]))} & Lvs  \\
+  \InDatalog{var_defined(V, P)} & \InRust{bb0[0]}: \InRust{x = 7} & \InRust{(x, M(bb0[0]))} & Lvs  \\
+  \InDatalog{var_drp_usd(V, P)} & \InRust{bb0[0]}: \InRust{drop(x)} & \InRust{(x, M(bb0[0]))} & Lvs  \\
+  \InDatalog{var_uses_rgn(V, R)} & \InRust{let x: &'x i32;} & \InRust{(x, 'x)} & Lvs  \\
+  \InDatalog{var_drps_rgn(V, R)} &
                                   \begin{tabular}[t]{@{}l@{}}
-                                    \InRust{struct Wrap<'p> { p: &'p i32 }} \\
-                                    \InRust{impl<'p> Drop for Wrap<'p> {...}} \\
-                                    \InRust{let x: Wrap = ...} \\
+                                    \InRust{struct Wr<'p> { p: &'p i32 }} \\
+                                    \InRust{impl<'p> Drop for Wr<'p> {...}} \\
+                                    \InRust{let x: Wr = ...} \\
                                     \InRust{drop(x)}
                                   \end{tabular}
                       & \InRust{(x, 'p)}& Lvs  \\
@@ -1229,15 +1230,16 @@ atoms used in Polonius can be found in Table~\ref{tab:input-atoms}.
 
 
        & Init  \\
-  \InDatalog{path_belongs_to_var(M, V)} & \InRust{let x = (17, (23, 29));} & \InRust{(x, x)} & Init  \\
-  \InDatalog{initialized_at(M, P)} & \InRust{bb0[0]}: \InRust{x.0 = 17;} & \InRust{(x.0, Mid(bb0[0]))} & Init  \\
-  \InDatalog{moved_out_at(M, P)} & \InRust{bb0[0]}: \InRust{f(move x.0)} & \InRust{(x.0, Start(Success(bb0)))} & Init  \\
-  \InDatalog{path_accessed_at(M, P)} & \InRust{bb0[0]}: \InRust{x.val + 7} & \InRust{(x.val, Mid(bb0[0]))} & Init
+  \InDatalog{pth_blngs_t_vr(M, V)} & \InRust{let x = (17, (23, 29));} & \InRust{(x, x)} & Init  \\
+  \InDatalog{pth_ass._at(M, P)} & \InRust{bb0[0]}: \InRust{x.0 = 17;} & \InRust{(x.0, M(bb0[0]))} & Init  \\
+  \InDatalog{pth_mvd_at(M, P)} & \InRust{bb0[0]}: \InRust{f(move x.0)} & \InRust{(x.0, S(Success(bb0)))} & Init  \\
+  \InDatalog{pth_acc._at(M, P)} & \InRust{bb0[0]}: \InRust{x.val + 7} & \InRust{(x.val, M(bb0[0]))} & Init
 \end{tabular}
 \caption[Input Facts to Polonius]{Polonius input facts, with minimal code
   examples. All facts except \texttt{invalidates}, \texttt{cfg\_edge},
   \texttt{killed}, \texttt{borrow\_region}, \texttt{outlives}, and
-  \texttt{universal\_region} were added as part of the work on this thesis.}\label{tab:input-facts}
+  \texttt{universal\_region} were added as part of the work on this thesis.
+  Names are heavily abbreviated to fit the page.}\label{tab:input-facts}
 \end{table}%
 }
 
@@ -1261,8 +1263,7 @@ other words, it is not a full replacement of the current implementation.
     represent facts, and black boxes (sub-)modules.}\label{fig:fact-module-hierarchy}
 \end{figure}
 
-All inputs based on provenance variables (that is, the ones with ``region'' in
-their names from the previous terminology); \texttt{path\_belongs\_to\_var},
+All inputs based on provenance variables; \texttt{path\_belongs\_to\_var},
 \texttt{universal\_region}, \texttt{borrow\_region}, \texttt{var\_uses\_region},
 and \texttt{outlives}, are all generated using information obtained during
 MIR~type-checking. The rest of the inputs are generated either from walking the
@@ -1615,6 +1616,7 @@ let y = &mut pt.1;
     Variable & Atom & A MIR (or Rust) variable. \\
     \InDatalog{cfg_edge(From, To)}\notmine{} & Fact & A transition in the CFG\@. \\
     \InDatalog{var_used(Var, Node)} & Fact & A regular variable use happens here.\\
+    \InDatalog{var_drop_used(Var, Node)} & Fact & A variable drop-use might happen here.\\
     \InDatalog{var_defined(Var, Node)} & Fact & A variable is assigned here.\\
     \InDatalog{var_uses_region(Var, Provenance)} & Fact & Connects provenance variables from types to their variables.\\
     \InDatalog{var_drops_region(Var, Provenance)} & Fact & Deallocating this variable indirectly uses this provenance variable. \\
@@ -1836,14 +1838,14 @@ var_drop_live(V, P) :-
                    Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_drop_used(x, Start(bb0[1]))}\\
-                     \InRust{var_maybe_initialized_on_exit(x, Mid(bb0[0]))}\\
+                     \InRust{var_maybe_init_on_exit(x, Mid(bb0[0]))}\\
                      \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
                    \end{tabular} &%
                                    \InRust{var_drop_live(x, Start(bb0[1]))} \\ \toprule
                                    % End first positive example
                    \begin{tabular}[t]{@{}l}
                    \InRust{var_drop_live(x, Start(bb0[1]))}\\
-                   \InRust{var_maybe_initialized_on_exit(x, Mid(bb0[0]))}\\
+                   \InRust{var_maybe_init_on_exit(x, Mid(bb0[0]))}\\
                    \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
                    \end{tabular} &%
                                    \InRust{var_drop_live(x, Mid(bb0[0]))}
@@ -2096,7 +2098,7 @@ path_maybe_initialized_on_exit(Path, Node) :-
 path_maybe_initialized_on_exit(Path, TargetNode) :-
     path_maybe_initialized_on_exit(Path, SourceNode),
     cfg_edge(SourceNode, TargetNode),
-    !moved_out_at(Path, TargetNode).
+    !path_moved_at(Path, TargetNode).
 
 var_maybe_partly_initialized_on_exit(Var, Node) :-
     path_maybe_initialized_on_exit(Path, Node),
@@ -2203,6 +2205,7 @@ path_maybe_uninitialized_on_exit(Path, Node2) :-
     \InDatalog{region_live_at(Provenance, Node)} & Fact & This provenance variable is live at this node, and the conditions of its loan must be accepted. \\
     \InDatalog{borrow_region(Provenance, Loan, Node)}\notmine{} & Fact & A borrow expression at this node creates this loan and this provenance variable. \\
     \InDatalog{invalidates(Node, Loan)}\notmine{} & Fact & An operation at this node would violate this loan if it were live. \\
+    \InDatalog{killed(Loan, Node)}\notmine{} & Fact & This loan is killed by a reassignment at this point. \\
     \InDatalog{subset(Provenance1, Provenance2)}\notmine{} & Intermediate & There is a subset relationship between two provenances at this node. \\
     \InDatalog{requires(Provenance, Loan, Node)}\notmine{} & Intermediate & This provenance contains this loan at this node. \\
     \InDatalog{loan_live_at(Loan, Node)}\notmine{} & Intermediate & This loan is live at this node. \\
@@ -2216,7 +2219,7 @@ path_maybe_uninitialized_on_exit(Path, Node2) :-
 { \renewcommand{\arraystretch}{1.0}
   \begin{table}[!htbp]    
 \begin{tabular}{@{}l l l l l}
-  Statement & Killed & Invalidates & New Constraints & Live provenances \\ \toprule
+  Statement & Killed & Invalidates & New Constraints & Live prov:s \\ \toprule
   \InRust{let p: &'p i32 = &'1 x} & & &  \InRust{'1} $\subseteq$ \InRust{'p}, \InRust{&'1 x} $\in$ \InRust{'1} &  \\
   \InRust{let q: &'q i32 = &'2 x} & & & \InRust{'2} $\subseteq$ \InRust{'q}, \InRust{&'2 x} $\in$ \InRust{'2} & \InRust{'p} \\
   \InRust{let r: &'r i32} & & &  & \InRust{'p} \\
@@ -2232,7 +2235,7 @@ path_maybe_uninitialized_on_exit(Path, Node2) :-
   the fourth statement, the set memberships would be \InRust{'p} $=
   \Set{\text{\InRust{&'1 x}}}$, \InRust{'q} $= \Set{\text{\InRust{&'3 y}}}$,
   \InRust{'r} $= \Set{\text{\InRust{&'4 x}, \InRust{&'5 y}}}$,
-  resulting in only one two errors. Additionally, note that the imprecision
+  resulting in only two errors. Additionally, note that the imprecision
   introduced by the \InRust{if}~statement leads to dual subset constraints.}\label{tab:borrowck-example}
 \end{table}%
 }
@@ -2355,7 +2358,7 @@ the node~$P$ where the borrow occurred.
 
 \begin{sourcecode}
   \captionof{listing}{A provenance variable\InDatalog{P} trivially contains
-    (\InDatalog{require(P, L, _)}s) the loan~\InDatalog{L} which introduced
+    (\InDatalog{requires(P, L, _)}) the loan~\InDatalog{L} which introduced
     it.}\label{lst:requires-borrow}
 \begin{minted}{prolog}
 requires(R, L, P) :- borrow_region(R, L, P).

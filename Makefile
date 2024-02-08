@@ -14,7 +14,6 @@ Thesis.pdf: Thesis.tex bibliography.bib
     -shell-escape \
     -file-line-error \
     -halt-on-error \
-    -interaction=nonstopmode \
     $< \
 	&& source deactivate
 
