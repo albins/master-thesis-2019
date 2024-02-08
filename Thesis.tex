@@ -1445,6 +1445,9 @@ let y = &mut pt.1;
 
 \section{Liveness, as Experienced by Polonius}\label{sec:liveness}
 
+A summary of the facts, intermediate relations, and outputs of Polonius'
+liveness computations can be found in Table~\ref{tab:liveness-facts-recap}.
+
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[h]
   \begin{tabular}{@{}l l m{5.5cm}}
@@ -1661,7 +1664,7 @@ region_live_at(R, P) :-
     Provenance\notmine & A & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
     Point\notmine & A & A point in the control-flow graph. \\
     Variable & A & A MIR (or Rust) variable. \\
-    Path & Atom & A move path. \\
+    Path & A & A move path. \\
     \InDatalog{cfg_edge(P, Q)}\notmine & F & A transition in the CFG. \\
     \InDatalog{child(Path2, Path1)} & F & \InDatalog{Path1} is a prefix of-, and not equal to \InDatalog{Path2}  \\
     \InDatalog{initialized_at(Path, P)} & F, I & This path was given a value here. \\
@@ -1669,10 +1672,10 @@ region_live_at(R, P) :-
     \InDatalog{path_accessed_at(Path, Point)} & F, I & This move path is used in an expression here.\\
     \InDatalog{moved_out_at(Path, P)} & F, I & This path was moved from this scope in an expression here. \\
     \InDatalog{ancestor(Above, Below)} & I & \InDatalog{Above} is a prefix of \InDatalog{Below}.\\
-    \InDatalog{path_maybe_init...exit(Path, Point)} & I & \InDatalog{Path} is initialized without subsequent deinitialisation on one or more branches reaching this CFG node (lowest upper bound on set membership).\\
-    \InDatalog{path_definitely_init...(Path, Point)} & I &  \InDatalog{Path} is initialised on all branches reaching \InDatalog{Point} (greatest lower bound on membership). \\
-    \InDatalog{path_maybe_mov...(Path, Point)} & I & \InDatalog{Path} has been moved without subsequent reinitialisation on at least one branch reaching this CFG node. \\
-    \InDatalog{var_maybe_init...(Var, Point)} & O & This variable is initialised along at least one branch reaching this node at the time of its exit. \\
+    \InDatalog{path_maybe_init___exit(Path, Point)} & I & \InDatalog{Path} is initialized without subsequent deinitialisation on one or more branches reaching this CFG node (lowest upper bound on set membership).\\
+    \InDatalog{path_definitely_init___(Path, Point)} & I &  \InDatalog{Path} is initialised on all branches reaching \InDatalog{Point} (greatest lower bound on membership). \\
+    \InDatalog{path_maybe_mov___(Path, Point)} & I & \InDatalog{Path} has been moved without subsequent reinitialisation on at least one branch reaching this CFG node. \\
+    \InDatalog{var_maybe_init___(Var, Point)} & O & This variable is initialised along at least one branch reaching this node at the time of its exit. \\
     \InDatalog{move_error(Path, Point)} & O & Error: \InDatalog{Path} is accessed here, but may have been moved, or was never initialised. \\
   \end{tabular}
 \caption{Move Analysis Dramatis Personae}
@@ -1689,7 +1692,9 @@ use of \InRust{x} would also use \InRust{x.f}, for example. This transitive
 expansion of facts happens in a pre-computation described in
 Section~\ref{sec:move:fixpoints}. Finally, we trace root paths (and therefore
 also their transitive children) back to their variables through
-\InDatalog{path_belongs_to_var}.
+\InDatalog{path_belongs_to_var}. A summary of the inputs, outputs, and
+intermediary relationships involved in the computation can be found in
+Table~\ref{tab:move-facts-recap}.
 
 However, Rust programs like all Turing-complete programs, are not deterministic.
 Therefore initialisation tracking is necessarily imprecise upon branching; if
