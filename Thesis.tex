@@ -918,35 +918,50 @@ fn main() {
 
 The MIR consists of basic blocks in the traditional compilers sense, each
 containing a set of statements and usually ending with a \emph{terminator}, an
-expression providing a branching to other basic blocks~\cite{mir_rfc}. A
-side-to-side comparison between a small Rust program and its MIR can be seen in
-Figure~\ref{fig:mir-example}.
+expression providing a branching to one or two basic blocks (its
+\emph{successors})~\cite{mir_rfc}. A side-to-side comparison between a small
+Rust program and its MIR can be seen in Figure~\ref{fig:mir-example}. The
+Polonius analysis is performed at the level of these blocks, addressing each
+statement of the block in two phases: its start and mid-point. The start of a
+block is before the statement has taken effect, and the mid-point is just after.
+We use the notation \InRust{Start(bb0[0])} to refer to the starting point of
+block 0's first statement, and \InRust{Success(bb5)} to refer to the first
+statement of the block following the success branch of basic block~5.
 
-\subsection{Input Facts}
-\label{sec:input-facts}
+\section{Generating Inputs for Polonius}
 
-The following short-hand names are used:
-\begin{description}
-\item[$R$] is a provenance variable, a set of loans.
-\item[$L$] is a loan, that is a \InRust{&v} expression creating a reference
-  to \InRust{v}.
-\item[$P, Q$] are points in the control-flow graph of the function under analysis.
-\item[$V$] is a variable.
-\item[$M$] is a move path, that is a part of a variable that can be accessed
-  and, more importantly, moved. This can be the name of a variable (e.g.
-  \InRust{a}), or an access to a field of a data structure or one of a tuple's
-  projections (e.g. \InRust{a.b}, or \InRust{a.1}).
-\end{description}
-
+The Rust compiler analyses the MIR and emits \textit{facts} that Polonius uses
+to derive its conclusions from the Datalog rules described
+in~\ref{cha:implementation}. An overview of the inputs with examples of when
+they are used can be seen in Table~\ref{tab:input-facts}, but will be more
+closely introduced when they are used. The facts describe the relationship
+between \textit{atoms}, the objects in the world of Polonius. An overview of the
+atoms used in Polonius can be found in Table~\ref{tab:input-atoms}.
 
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[h]
-\begin{tabular}{@{}l@{} @{}l@{} l@{} @{}l@{}}
+  \begin{tabular}{@{}l l m{7cm}}
+    Atom & Example & Description \\ \hline
+    Loan\notmine & \InRust{&x} & An individual borrow expression. \\
+    Provenance variable\notmine & \InRust{'a} & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine & \InRust{Mid(bb1[5])} & A point in the control-flow graph. \\
+    Move path & \InRust{x.y.z} & A precise field that can be accessed into a variable; a field in a struct or a projection in a tuple. \\
+    Variable & \InRust{x} & \\
+  \end{tabular}
+\caption[Polonius Atoms]{The atoms used in Polonius. Variables and move paths
+  were introduced as part of this thesis.}
+  \label{tab:input-atoms}
+\end{table}%
+}
+
+{ \renewcommand{\arraystretch}{1.0}
+\begin{table}[h]
+\begin{tabular}{@{}l l@{} l@{} @{}l@{}}
   Fact & Code Example & Resulting Tuple(s) & Used \\ \hline
-  \InDatalog{borrow_region(R, L, P)} & \InRust{bb0[0]}: \InRust{_1 = &1;}&
+  \InDatalog{borrow_region(R, L, P)}\notmine & \InRust{bb0[0]}: \InRust{_1 = &1;}&
                                                                            \InRust{('a, &1, Mid(bb0[0]))} & Bck  \\
-  \InDatalog{universal_region(R)} & \InRust{fn f<'b>(x: &'b str)} & \InRust{('b)} & Bck \\
-  \InDatalog{cfg_edge(P, Q)} &
+  \InDatalog{universal_region(R)}\notmine & \InRust{fn f<'b>(x: &'b str)} & \InRust{('b)} & Bck \\
+  \InDatalog{cfg_edge(P, Q)}\notmine &
                                \begin{tabular}[t]{@{}l l@{}}
                                  \InRust{bb0[0]}: & \InRust{_1 = 1;} \\
                                  \InRust{bb0[1]}: & \InRust{_2 = 3;}
@@ -958,18 +973,18 @@ The following short-hand names are used:
                         \InRust{(Start(bb0[1]), Mid(bb0[1]))}\\
                         \end{tabular}
                         & All \\
-  \InDatalog{killed(L, P)} &
+  \InDatalog{killed(L, P)}\notmine &
                              \begin{tabular}[t]{@{}l l@{}}
-                               \InRust{bb0[0]}: &\InRust{_2 = &_1;} \\
-                               \InRust{bb0[1]}: &\InRust{_1 = 17;}
+                               \InRust{bb0[0]}: &\InRust{_3 = &_1;} \\
+                               \InRust{bb0[1]}: &\InRust{_3 = &_2;}
                              \end{tabular}                                                    
                       &
                         \InRust{(&_1, Mid(bb0[1]))}
                                            & Bck \\
-  \InDatalog{outlives(R1, R2, P)} &
+  \InDatalog{outlives(R1, R2, P)}\notmine &
                                     \InRust{bb0[0]}: \InRust{p: &'p i32 = &'x x;}
                                      & \InRust{('x, 'p, Mid(bb0[0]))} & Bck \\
-  \InDatalog{invalidates(P, L)} &
+  \InDatalog{invalidates(P, L)}\notmine &
                                   \begin{tabular}[t]{@{}l l@{}}
                                     \InRust{bb0[0]}: & \InRust{_2 = &_1;} \\
                                     \InRust{bb0[1]}: & \InRust{_1 = 3;}
@@ -1000,108 +1015,27 @@ The following short-hand names are used:
        & Init  \\
   \InDatalog{path_belongs_to_var(M, V)} & \InRust{let x = (17, (23, 29));} & \InRust{(x, x)} & Init  \\
   \InDatalog{initialized_at(M, P)} & \InRust{bb0[0]}: \InRust{x.0 = 17;} & \InRust{(x.0, Mid(bb0[0]))} & Init  \\
-  \InDatalog{moved_out_at(M, P)} & \InRust{bb0[0]}: \InRust{f(move x.0)} & \InRust{(x.0, Start(Success(bb0[0])))} & Init  \\
+  \InDatalog{moved_out_at(M, P)} & \InRust{bb0[0]}: \InRust{f(move x.0)} & \InRust{(x.0, Start(Success(bb0)))} & Init  \\
   \InDatalog{path_accessed_at(M, P)} & \InRust{bb0[0]}: \InRust{x.val + 7} & \InRust{(x.val, Mid(bb0[0]))} & Init
 \end{tabular}
-\caption[Input Facts to Polonius]{Polonius Input Facts}
+\caption[Input Facts to Polonius]{Polonius input facts, with minimal code
+  examples. All facts except \texttt{invalidates}, \texttt{cfg\_edge},
+  \texttt{killed}, \texttt{borrow\_region}, \texttt{outlives}, and
+  \texttt{universal\_region} were added as part of the work on this thesis.}
   \label{tab:input-facts}
 \end{table}%
 }
 
-
-\begin{description}
-\item[\InDatalog{borrow_region(R, L, P)}] the provenance variable~$R$ may refer
-  to data from loan $L$ starting at the point $P$. This is usually the point
-  \emph{after} the right-hand-side of a borrow expression, when the reference
-  has been assigned and can be accessed. This corresponds to the $\left \{
-    ^{\omega}\pi\right \}$ part of the typing for borrowing
-  (Rule~\eqref{eq:t-borrow}), and is used for relating an actual borrow to the
-  first variable holding the created reference in
-  Section~\ref{sec:loan-constr-prop}, starting the initial propagation of the loan.
-  
-\item[\InDatalog{universal_region(R)}] for each named/parametrised provenance
-  variable~$R$ supplied to the function. $R$ is considered universally
-  quantified, and therefore live in every point of the function.
-  
-\item[\InDatalog{cfg_edge(P, Q)}] whenever there is an edge~$P \rightarrow Q$ in
-  the control flow graph.
-    
-\item[\InDatalog{killed(L, P)}] when some prefix of the path borrowed in $L$ is
-  assigned at point~$P$, meaning that reference is overwritten.
-    
-\item[\InDatalog{outlives(R1, R2, P)}] when $R_1 \subseteq R_2$ must hold at
-  point~$P$, a consequence of subtyping relationships as described in
-  Rule~\eqref{eq:s-ref}. The term ``outlives'' has a historical origin in the
-  previous terminology of lifetimes and the input will be renamed in future
-  versions of Polonius.
-    
-\item[\InDatalog{invalidates(P, L)}] when the loan~$L$ is invalidated by some
-  operation at point~$P$.
-    
-\item[\InDatalog{var_used(V, P)}] when the variable~$V$ is used for anything but
-  a drop at point~$P$.
-    
-\item[\InDatalog{var_defined(V, P)}] when the variable~$V$ is assigned to
-  (killed) at point~$P$.
-  
-\item[\InDatalog{var_drop_used(V, P)}] when the variable~$V$ is used in a drop
-  at point~$P$.
-
-\item[\InDatalog{var_uses_region(V, R)}] when the type of~$V$ includes the
-  provenance~$R$.
-
-\item[\InDatalog{var_drops_region(V, R)}] when the type of~$V$ includes the
-  provenance~$R$, and~$V$ also implements a custom drop method which might need
-  all of~$V$'s data, as discussed in Section~\ref{sec:deall-as-spec}. Notably,
-  for the MIR in Listing~\ref{fig:mir-drop}, \InDatalog{var_drops_region(_2, R)}
-  would be emitted to indicate that the \InRust{struct} stored in \InRust{_2}
-  contains a reference with the provenance variable $R$ in its type, and that
-  this reference could be accessed during the deallocation at this point, were
-  it to happen.
-
-\item[\InDatalog{child(M1, M2)}] when the move path $M_1$ is the child of $M_2$,
-  That is, for example in the expression \InRust{x.y.z}, \InRust{x.y.z} is a
-  child of \InRust{x.y} and \InRust{x}. In the implementation at the time of
-  writing, \InDatalog{child} contained all descendants (children of children),
-  but in future versions the intention is to just use direct relations and have
-  Polonius infer the transitive closures.
-
-\item[\InDatalog{path_belongs_to_var(M, V)}] if $M$ is the root path into $V$.
-
-\item[\InDatalog{initialized_at(M, P)}] when the move path $M$ was initialized
-  at point $P$, such as for example in the expression \InRust{x.y = 17}, which would
-  initialise the path \InRust{x.y}. Note that the fact is emitted only for the
-  specific path being initialised, and that the transitive initialisation of the
-  prefix' children is implicit.
-
-\item[\InDatalog{moved_out_at(M, P)}] when the move path $M$ was moved out
-  (deinitialised) at point $P$. The same logic about implicit moves as for
-  \InDatalog{initialzed_at} applies here.
-
-\item[\InDatalog{path_accessed_at(M, P)}] when the move path $M$ was accessed at
-  point $P$. This fact is not used in any of the current calculations, but is
-  the final component needed to calculate erroneous accesses of (potentially)
-  moved paths.
-\end{description}
-
-\section{Generating Facts for Polonius in the Rust Compiler}
-
-As stated above, the Polonius analysis is performed on the MIR, and the results
-are then mapped back onto the source code when generating user-facing errors.
-While Polonius is a self-contained package with a well-defined interface,
-however, the interface to the code performing the translation of
-compiler-internal data structures into input facts for Polonius has a much
+While Polonius is a self-contained package with a single interface, the code
+translating compiler-internal data structures into Polonius facts has a much
 larger surface area. All the additions to the Rust compiler occurs in the
-\texttt{librustc\_mir::borrow\_check::nll}~module, that is alongside the current
-borrow checker (``NLL''). The module hierarchy and the location of emission of
-the various facts is shown in Figure~\ref{fig:fact-module-hierarchy}. It is
-worth noting that the Polonius analysis piggy-backs off of previous analysises,
-notably the \texttt{outlives} constraints generated by the previous borrow
-checker during type-checking.
-
-All facts except \texttt{invalidates}, \texttt{cfg\_edge}, \texttt{killed},
-\texttt{borrow\_region}, \texttt{outlives}, and \texttt{universal\_region} were
-added as part of the work on this thesis.
+\texttt{librustc\_mir::borrow\_check::nll}~module, alongside the current borrow
+checker (``NLL''). The module hierarchy and the location of emission of the
+various facts is shown in Figure~\ref{fig:fact-module-hierarchy}. The reason for
+this complex intermingling of modules is that Polonius fact generation
+piggy-backs off of previous analysises, notably the \texttt{outlives}
+constraints generated by the previous borrow checker during type-checking. In
+other words, it is not a full replacement of the current implementation.
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/rustc-module-structure}
@@ -1130,8 +1064,8 @@ the \texttt{type\_check} submodule. This possible future design is discussed in
 more detail in Chapter~\ref{cha:conclusions}.
 
 Returning to one of the examples of the borrowing rules in
-Section~\ref{sec:borrowing-rules}, we can describe some of the facts that would
-be output on each line. An annotated example can be seen in
+Chapter~\ref{cha:borrowing-rules}, we can describe some of the facts that would
+be emitted on each line. An annotated example can be seen in
 Listing~\ref{lst:polonius-fact-emission}.
 
 \begin{sourcecode}
@@ -1152,7 +1086,7 @@ Listing~\ref{lst:polonius-fact-emission}.
 \end{minted}
 \end{sourcecode}
 
-In practice, this would happen at the MIR level, which would introduce
+The example above is slightly simplified; the translation to MIR would introduce
 intermediary variables. However, the core reasoning is the same: the right-hand
 side of the assignment is typed with a provenance variable \InRust{'1},
 containing only that loan. The assignment to \InRust{x} then sets up a subtyping
@@ -1160,8 +1094,8 @@ relationship with the corresponding \InDatalog{outlives('1, 'x)} fact that
 propagates it to \InRust{x}'s provenance variable \InRust{'x}, ensuring it is
 considered live when the loan on the next line generates a fact
 \InRust{invalidates(b0)}, resulting in the eventual derivation of an
-\InRust{error}.
-
+\InRust{error}. Precisely how these errors are derived is the subject of
+Chapter~\ref{cha:implementation}.
 
 \chapter{Datafrog, a Datalog Embedded in Rust}\label{cha:datalog}
 \section{Why Datalog?}\label{sec:why-datalog}
