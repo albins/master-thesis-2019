@@ -314,8 +314,8 @@ shared memory.
 \section{Contributions}\label{sec:contributions}
 
 While this thesis is about developing Polonius rather than initially designing
-it, Polonius itself is novel in that is to our knowledge the first instance of
-Datalog use in the implementation of a compiler for a practical programming
+it, Polonius itself is novel in that it is to our knowledge the first instance
+of Datalog use in the implementation of a compiler for a practical programming
 language. Systems like Doop~\cite{bravenboer_strictly_2009}, as well as other
 uses of the Souffl{\'e} system~\cite{souffle} have been deployed for practical
 analysis of large Java code bases, but their use has been in separate tools
@@ -357,7 +357,7 @@ support for functional programming paradigms (higher-order functions, lambda
 expressions, closures, pattern matching). It also comes with the build tool and
 dependency manager cargo, which greatly improves the experience over using tools
 like automake, cmake, etc, in particular with respect to dependency management.
-Additionally, it also supports object-oriented like programming styles (without
+Additionally, it supports object-oriented like programming styles (without
 inheritance) through traits~\cite{scharli2003traits}, a concept similar to
 Java's interfaces, combined with C-like \InRust{struct}s.
 
@@ -429,7 +429,7 @@ the current borrow checker reasons about references and their referents (the
 memory they refer to) in terms of \textit{lifetimes}, interpreted as the lines
 of a program where a reference may be used. Polonius is designed to address this
 imprecision by extending the reasoning power of the borrow check to be
-flow-sensitive, that is reason at the level of each individual program
+flow-sensitive, that is, reason at the level of each individual program
 statement. For a slightly longer explanation of the differences between the
 current borrow checker and Polonius, see Section~\ref{sec:reference-provenance}.
 
@@ -456,7 +456,7 @@ fn parse<'buf>(_buffer: &'buf mut String) -> &'buf str {
 \end{minted}
 \end{sourcecode}
 
-The other reason for Polonius is to more clearly capture the semantics of the
+The other motivation for Polonius is to more clearly capture the semantics of the
 borrow check in a domain-specific language. Rust's aliasing rules are not,
 strictly speaking, formalised. This means that future versions of Rust may
 change parts of the analysis. Therefore, having a clear, logic-like
@@ -495,10 +495,9 @@ use-after-frees. A mutable reference must not be (effectively) aliased.
 
 A summary of the rules enforced by the borrow check can be found in
 Table~\ref{tab:borrow-check}, along with positive and negative examples.
-\goodexample{green} and \badexample{red} boxes illustrate where the
-borrow check would occur with or without an error, respectively. Many of these
-examples are taken directly or slightly modified from
-\citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
+\goodexample{green} and \badexample{red} boxes illustrate where the borrow check
+would occur without or with an error, respectively. Many of these examples are
+borrowed from \citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 
 { \renewcommand{\arraystretch}{2.0}
 \begin{table}[!htbp]
@@ -692,22 +691,23 @@ function \InRust{next()} takes a reference to a \InRust{String}, and, more
 importantly, guarantees that it will return something that lives for at least as
 long, which is \InRust{'buf}.
 
-Lifetimes in NLL are \textit{sets of lines of code a value lives for}. Given
-this notation, a value is said to \textit{outlive} another if it lives for a
-larger number of lines. There is also a the named lifetime \InRust{'static},
-which corresponds to the entire program, and so outlives every other lifetime.
-An error in NLL is reported if there is a violation of a loan overlapping its
-lifetime. However, the lifetimes formulation cannot express certain safe patterns, such as
-the one in Listing~\ref{lst:motivating-example}, where the lifetime of the loan
-ends up encompassing the entire loop unnecessarily.
+A lifetime in NLL is a \textit{set of lines of code a value lives for}. Given
+this notation, a value is said to \textit{outlive} another if the lines it lives
+for is a superset of the other's. There is also the named lifetime
+\InRust{'static}, which corresponds to the entire program, and so outlives every
+other lifetime. An error in NLL is reported if there is a violation of a loan in
+one of the lines it is live for. However, the lifetimes formulation cannot
+express certain safe patterns, such as the one in
+Listing~\ref{lst:motivating-example}, where the lifetime of the loan ends up
+encompassing the entire loop unnecessarily.
 
 This is why Polonius turns the relation between lifetimes and loans on its head.
 Its interpretation is that what was previously called a lifetime will now be
 called a \textit{provenance} of the loan, and corresponds to the set of loans
 (calls to a reference constructor) that could have given rise to the reference.
-Named provenances, \textit{ne{\'e}} named lifetimes, (such as \InRust{'lifetime}
-above) are referred to as ``provenance variables''.~\footnote{In the literature,
-  the terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
+Named provenances, such as \InRust{'lifetime} above, are referred to as
+``provenance variables''.~\footnote{In the literature, the terms
+  ``region''~\cite{matsakis_alias-based_2018}, ``(named)
   lifetime''~\nocite{noauthor_rfc_2019}, and ``reference
   provenance''~\cite{weiss_oxide:_2019} (provenance) are all employed. As the
   section heading suggests, we will use the last one of them as we believe it
@@ -795,7 +795,7 @@ typing judgement in Rule~\eqref{eq:s-ref-baby}, which says that a reference type
 is a subtype of another reference type iff their provenance variables are a
 subset. These typing judgements are implied on assignments with the intuition
 (based on Liskov's Substitution Principle) that you can only assign a right-hand
-side to a left-hand-side if the right-hand-side can function as a (is a subtype
+side to a left-hand-side if the right-hand-side can function as (is a subtype
 of) the left-hand-side. This means in terms of provenances that a reference
 type~$\tau_1$ is a subtype of another reference type~$\tau_2$ if it has a weaker
 dependency on loans, that is does not depend on additional loans. Such
@@ -813,7 +813,7 @@ Most of the conventions used in the Oxide formulation can be glossed over for
 the purposes of our understanding, but the most important ones are the type
 environment~$\Gamma$, used to map places ($\pi, \pi_1$, and so on) to their
 types ($\tau, \tau_1$, etc). Oxide also needs to distinguish between types of
-statically known size ($\tau^S$) and unknown size ($\tau^U$) As reference types
+statically known size ($\tau^S$) and unknown size ($\tau^U$). As reference types
 contain provenance variables ($\rho$), this type environment is stateful, in
 that for example typing a reference-constructing expression would modify the
 typing environment to add a new loan. Other notation used in the Oxide typing
@@ -830,7 +830,7 @@ Judgments on the form~$\Gamma \vdash_{\omega} \pi \: : \: \tau$ mean that ``in
 the environment~$\Gamma$, it is safe to use the variable~$\pi$ (of type~$\tau$)
 $\omega$-ly''~\cite{weiss_oxide:_2019}. In other words, if $\omega$~is
 \emph{unique}, it means that there are no live loans of any paths
-overlapping~$\pi$, and of $\omega$~is \emph{shared} that there are no
+overlapping~$\pi$, and if $\omega$~is \emph{shared} that there are no
 overlapping loans in the provenance part of $\tau$. The full type system handles
 degradation of these types of references, etc, but would be far beyond the scope
 of our comparison here.
@@ -859,7 +859,7 @@ of Polonius.
 The second rule, Rule~\eqref{eq:t-borrow}, states that we may create an
 $\omega$-reference to any variable $\pi$ of type $\tau$ where $\omega$-use is
 safe, and produce a reference of equal $\omega$~access to that variable of the
-type ``reference to a value of type,~$\tau$, with its provenance variable being
+type ``reference to a value of type~$\tau$, with its provenance variable being
 the set containing only that loan, denoted $^{\omega}\pi$''. This corresponds to
 the input fact \InDatalog{borrow_region(R, L, P)}, described in
 Section~\ref{cha:borrow-check-compiler}, and follows the intuition that if we
@@ -988,8 +988,9 @@ prerequisite), and if the $\tau_1$ does not require any loans except the ones in
 $\tau_1$, the super-type. The intuition for this is that if we are to use
 $\tau_1$ as a $\tau_2$, the conditions of that loan must not include conditions
 (notably, liveness of the value at the other end of the reference) beyond what
-$\tau_2$ promises. In Polonius, this is represented by the \InDatalog{outlives}
-fact, which is the major source of constraints on loans.
+$\tau_2$ promises. In Polonius, this is represented by the
+\InDatalog{outlives(PV1, PV2, N)} fact, which is the major source of constraints
+on loans.
 
 \begin{equation}\label{eq:s-ref}
   \ntyperule{
