@@ -483,29 +483,36 @@ fn main() {
 \subsection{Reference Liveness}
 \label{sec:var-livenes}
 
-The basic liveness of a variable is defined as follows: if a variable $v$ is
-live in some point $q$ and $q$ is reachable from $p$ in the control-flow graph,
-then $v$ is live in $p$ too unless it was overwritten; in essence liveness is
-propagated backwards through the CFG.
+The basic liveness of a variable (Listing~\ref{lst:var-live}) is defined as
+follows: if a variable $v$ is live in some point $q$ and $q$ is reachable from
+$p$ in the control-flow graph, then $v$ is live in $p$ too unless it was
+overwritten; in essence liveness is propagated backwards through the CFG.
 
+\begin{sourcecode}
+  \captionof{listing}{The Datalog rules for variable
+    use-liveness.}\label{lst:var-live}
 \begin{minted}{prolog}
 var_live(V, P) :-
     var_live(V, Q),
     cfg_edge(P, Q),
     !var_defined(V, P).
 \end{minted}
+\end{sourcecode}
+
 
 There is also a very similar relation for drop-liveness with an identical shape
 and different input relations corresponding to drop-uses.
 
+Both of these are then used to calculate the reference liveness relation
+(Listing~\ref{lst:region-live-at}), which serves as input for the rest of the
+borrow checker. A given RefProv $r$ is live at some point $p$ if it is in the
+type of a variable $v$ which is either drop-live or use-live at $p$, with some
+notable caveats for drop-liveness (discussed in Section~\ref{sec:deall-as-spec})
+embedded in the \InDatalog{var_drops_region} relation.
 
-Both of these are then used to calculate the reference liveness relation, which
-serves as input for the rest of the borrow checker. A given RefProv $r$ is live
-at some point $p$ if it is in the type of a variable $v$ which is either
-drop-live or use-live at $p$, with some notable caveats for drop-liveness
-(discussed in Section~\ref{sec:deall-as-spec}) embedded in the
-\InDatalog{var_drops_region} relation.
-
+\begin{sourcecode}
+  \captionof{listing}{The Datalog rules RefProv
+    liveness.}\label{lst:region-live-at}
 \begin{minted}{prolog}
 region_live_at(R, P) :-
     var_drop_live(V, P),
@@ -515,6 +522,7 @@ region_live_at(R, P) :-
         var_live(V, P),
         var_uses_region(V, R).
 \end{minted}
+\end{sourcecode}
 
 \subsection{Variable Initialisation}
 \label{sec:var-initalisation}
