@@ -179,7 +179,6 @@
 \endgroup
   
 %\section*{Acknowledgements}
-%\fixme{I thank everyone for everything.}
 
 \chapter{Introduction}
 %\epigraph{\fixme{short quote}}
@@ -206,18 +205,6 @@ initialisation and deinitialisation tracking, and may-reference analysis for
 validation of Rust's memory safety guarantees.
 
 \fixme{mention results.}
-
-\section{On Voices and Situated Knowledges}\label{sec:situated-knowledge}
-
-I have chosen to use an active voice for most of this thesis. As there is a
-difference between views held or contributions made by me personally, I have
-opted, perhaps controversially, to use ``I'' rather than ``we''. However,
-following~\citeauthor{haraway}'s insights~\cite{haraway}, I would like to ground
-the knowledge I have produced during my work on this thesis in the greater Rust
-community. As laid out in the (current) foreword
-of~\citetitle{nichols_rust_nodate}, Rust is itself situated within a greater
-project of empowering users, or perhaps rather communities of users, to do
-greater things~\cite{nichols_rust_nodate}.
 
 \chapter{Background}
 Whenever a reference to a resource is created in Rust, its borrowing rules
@@ -658,9 +645,11 @@ fn main() {
 \section{Datalog and Datafrog}
 \label{sec:datalog}
 
-Datalog is a derivative of the logic programming language Prolog, with \fixme{x
-  guarantees about execution}. It describes fixpoint calculations over logical
-relations as predicates, described as fixed input \emph{facts}, computed
+Datalog is a derivative of the logic programming language Prolog, with the
+desirable properties that any program terminates in polynomial time, and in some
+variants also with the power to express all polynomial-time
+computation~\cite{afrati_datalog_1995}. It describes fixpoint calculations over
+logical relations as predicates, described as fixed input \emph{facts}, computed
 \emph{relations}, or \emph{rules} describing how to populate the relations based
 on facts or other relations. For example, defining a fact describing that an
 individual is another individual's parent might look like
@@ -1049,7 +1038,10 @@ due to syntax errors or missing dependencies from build failures at later stages
 of the build process that would involve Polonius. Therefore all non-compiling
 crates were excluded from the study.
 
-% exclusion: I did remove some results right?
+Additionally, I also excluded all functions that had no loans at all from the
+analysis, a surprisingly large portion; almost 47\%. This is most likely due to
+code generation producing short ``functions'' that does not actually involve any
+borrowing at all.
 
 The main metric of ``performance'' in this study is the time it would take
 Polonius to solve a given set of inputs. In this case, this also includes the
@@ -1121,8 +1113,20 @@ A typical Polonius input consists of a small number of tuples for most
 relations, as seen in Figure~\ref{fig:input-sizes}. In particular, most
 control-flow graphs are small in terms of number of nodes, and most functions
 only contain a small number of variables, with an even smaller number of loans.
-Drops are particularly rare, with \fixme{60\% of all studied functions having no
-  drops at all}.
+Drops are particularly rare, with 71\% of all studied functions having no
+(potential) drop-uses at all (0 median, 3.6 mean), and only very few loans
+(2~median, 5.4~mean).
+
+This points towards a need to have a low starting overhead for Polonius, as
+much of its analysis would have to be performed on very small inputs, where the
+solve-time would be dominated by any high constant setup time.
+
+However, repositories can be assumed to be typically compiled all at once.
+Therefore, it is also interesting to say something about the maximum input size
+per repository, under the assumption that few large functions would dominate the
+solve-time for that repository. After collecting the maximum values per repository,
+the median number of loans was 24, and the median number of potential drop-uses
+was 20 (regular uses was, for comparison, 174).
 
 I attempted to perform a principal-component analysis (PCA) of the input data in
 order to visually identify possible clusterings of types of inputs, but the
