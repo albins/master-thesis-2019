@@ -1415,6 +1415,33 @@ live loan (an observed tree falls in the woods, thus making a sound).
   \label{fig:polonius-overview}
 \end{figure}
 
+\section{What Is Being Borrowed and Moved?}\label{sec:paths}
+
+The borrow check specifically tracks memory at the resolution of \textit{paths},
+that is paths to concrete memory. Examples of paths is \InRust{x} (a variable on
+the stack), \InRust{x.f} (a field of a \InRust{struct}), \InRust{*x.f} (a field
+accessed through a reference), or \InRust{(*x.f)[_]} (an index of an array
+stored in a \InRust{struct} and accessed through a reference). However, an array
+counts as one path, ignoring its indices. Paths constitute trees, (or perhaps
+rather Russian nesting dolls) such as in the example of \InRust{x.f}, where
+\InRust{x.f} lies under \InRust{x}. We say that each path preceding (and
+including) a given path are its \textit{prefixes}. The topmost path, the
+variable name itself, we call a \textit{root path}. Finally, we say that paths
+\textit{overlap} if one of them is a prefix of the other. Intuitively, this mean
+that they involve the same region in memory.
+
+
+The fact that the borrow check is performed on paths means that the following
+code, for example, is sound, as the paths, and therefore also the loans do not
+overlap:
+\begin{minted}{rust}
+struct Point(u32, u32);
+
+let mut pt: Point = Point(6, 9);
+let x = &mut pt.0;
+let y = &mut pt.1;
+// no error; our loans do not overlap!
+\end{minted}
 
 \section{Liveness, as Experienced by Polonius}\label{sec:liveness}
 
@@ -1647,34 +1674,6 @@ region_live_at(R, P) :-
   \label{tab:move-facts-recap}
 \end{table}%
 }
-
-\subsection{What Is Being Borrowed and Moved?}\label{sec:paths}
-
-The borrow check specifically tracks memory at the resolution of \textit{paths},
-that is paths to concrete memory. Examples of paths is \InRust{x} (a variable on
-the stack), \InRust{x.f} (a field of a \InRust{struct}), \InRust{*x.f} (a field
-accessed through a reference), or \InRust{(*x.f)[_]} (an index of an array
-stored in a \InRust{struct} and accessed through a reference). However, an array
-counts as one path, ignoring its indices. Paths constitute trees, (or perhaps
-rather Russian nesting dolls) such as in the example of \InRust{x.f}, where
-\InRust{x.f} lies under \InRust{x}. We say that each path preceding (and
-including) a given path are its \textit{prefixes}. The topmost path, the
-variable name itself, we call a \textit{root path}. Finally, we say that paths
-\textit{overlap} if one of them is a prefix of the other. Intuitively, this mean
-that they involve the same region in memory.
-
-
-The fact that the borrow check is performed on paths means that the following
-code, for example, is sound, as the paths, and therefore also the loans do not
-overlap:
-\begin{minted}{rust}
-struct Point(u32, u32);
-
-let mut pt: Point = Point(6, 9);
-let x = &mut pt.0;
-let y = &mut pt.1;
-// no error; our loans do not overlap!
-\end{minted}
 
 The idea behind variable initialisation calculations is a fairly straightforward
 transitive closure computation. Initialisation for a path propagates forwards
