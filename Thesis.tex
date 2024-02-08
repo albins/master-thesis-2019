@@ -201,7 +201,7 @@ Polonius is a reformulation of Rust's signature borrow check in Datalog.
   (circa 64\%) actually do not create any references at all, and therefore does
   not need (most of) the Polonius analysis. Another conclusion from the study is
   that control-flow graph edge count and number of variables in the function
-  under analysis seems to have the highest correlation to longer solve-times,
+  under analysis seems to have the highest correlation to longer runtimes,
   and would therefore be useful proxies for the difficulty of an input.
 
 
@@ -457,10 +457,10 @@ is one of the motivations for using Datalog, in addition to the intention of
 having a clearer formulation in a data-oriented language.
 
 \begin{sourcecode}
-  \captionof{listing}{A motivating example for Polonius, rejected by the current
-    borrow checker. The code is sound, as the loaned \InRust{event} is either
-    returned out of the loop, or overwritten at the next iteration. Therefore,
-    there are no overlapping mutable loans of
+  \captionof{listing}[Motivating example for Polonius]{A motivating example for
+    Polonius, rejected by the current borrow checker. The code is sound, as the
+    loaned \InRust{event} is either returned out of the loop, or overwritten at
+    the next iteration. Therefore, there are no overlapping mutable loans of
     \InRust{buffer}.\cite{issue-51132}}\label{lst:issue-51132}
 \begin{minted}{rust}
 fn next<'buf>(buffer: &'buf mut String) -> &'buf str {
@@ -484,8 +484,8 @@ fn parse<'buf>(_buffer: &'buf mut String) -> &'buf str {
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/rustc-overview}
-  \caption{An overview of the Borrow Check's place in the process of compiling
-    Rust code, as described in the Rust Developer's
+  \caption[The Rust Compilation Process]{An overview of the Borrow Check's place
+    in the process of compiling Rust code, as described in the Rust Developer's
     Guide~\cite{rustc_developers_guide_nodate}.}
   \label{fig:rustc-overview}
 \end{figure}
@@ -506,11 +506,12 @@ side.
 
 \begin{figure}
   \includegraphics[width=0.65\linewidth]{Graphs/mir-example}
-  \caption{A graph rendering of the \InRust{main()} function from the Rust
+  \caption[MIR of a Small Rust Program With
+  Function Call]{A graph rendering of the \InRust{main()} function from the Rust
     program in Listing~\ref{lst:mir-example-input}, illustrating branching
-    (block 0), and a function call (5). Note the \texttt{unwind}~arm of block~5's
-    terminator (last line), which will be followed if the function call panics,
-    that is if something goes wrong during the call.}
+    (block 0), and a function call (5). Note the \texttt{unwind}~arm of
+    block~5's terminator (last line), which will be followed if the function
+    call panics, that is if something goes wrong during the call.}
   \label{fig:mir-example}
 \end{figure}
 
@@ -860,10 +861,11 @@ fn main() {
 
 \begin{figure}
   \includegraphics[width=0.65\linewidth]{Graphs/drop-main-mir}
-  \caption{A graph rendering of the MIR produced from the \InRust{main()}
-    function of Listing~\ref{lst:drop-liveness} illustrating a call to the
-    custom deallocator of~\InRust{_2} that would cause it to be drop-live during
-    the block. Take special note of the lack of calls to \InRust{drop(_6)}; as
+  \caption[MIR of a Program Utilising a Custom Deallocator]{A graph rendering of
+    the MIR produced from the \InRust{main()} function of
+    Listing~\ref{lst:drop-liveness} illustrating a call to the custom
+    deallocator of~\InRust{_2} that would cause it to be drop-live during the
+    block. Take special note of the lack of calls to \InRust{drop(_6)}; as
     \InRust{DefaultDrop}, the \InRust{struct} stored in \InRust{_6}, uses the
     default deallocator and contains only a reference, deallocating it is a
     no-op. Some irrelevant details, such as hints about stack allocations and
@@ -1012,12 +1014,12 @@ live loan (an observed tree falls in the woods, thus making a sound).
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/polonius-overview}
-  \caption{An overview of how the inputs and intermediate steps of Polonius
-    combine into the final output. Blue boxes represent facts and relations
-    implemented during the work on this thesis. Relations are shown using
-    boldface, and facts in regular font. The historical term ``region'' is used
-    here instead of provenance variables to match the convention used in the
-    actual code.}
+  \caption[Flowchart of the Polonius Inputs and Outputs]{An overview of how the
+    inputs and intermediate steps of Polonius combine into the final output.
+    Blue boxes represent facts and relations implemented during the work on this
+    thesis. Relations are shown using boldface, and facts in regular font. The
+    historical term ``region'' is used here instead of provenance variables to
+    match the convention used in the actual code.}
   \label{fig:polonius-overview}
 \end{figure}
 
@@ -1166,8 +1168,9 @@ var_maybe_initialized_on_exit(V, P) :-
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/liveness.pdf}
-  \caption{A graph representation of the the variable liveness calculation
-    results, with relevant Polonius facts as they occur (a droplet symbolising
+  \caption[MIR Fragment with Inputs and Outputs of the Liveness Analysis]{A
+    graph representation of the the variable liveness calculation results, with
+    relevant Polonius facts as they occur (a droplet symbolising
     \InDatalog{var_drop_used}, a wrench \InDatalog{var_used}, and a skull and
     crossbones symbolising \InDatalog{var_defined}). Variables are named by
     prefixing underscores, and edges annotated with the propagated live variable
@@ -1525,9 +1528,10 @@ added as part of the work on this thesis.
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/rustc-module-structure}
-  \caption{An illustration of where in the module hierarchy of the Rust compiler
-    the various facts are emitted. Underscores are replaced with white space for
-    readability. Blue boxes represent facts, and black boxes (sub-)modules.}
+  \caption[Polonius In Rust's Module Hierarchy]{An illustration of where in the
+    module hierarchy of the Rust compiler the various facts are emitted.
+    Underscores are replaced with white space for readability. Blue boxes
+    represent facts, and black boxes (sub-)modules.}
   \label{fig:fact-module-hierarchy}
 \end{figure}
 
@@ -1596,7 +1600,7 @@ or syntactically invalid code, both of which would happen long before Polonius
 in the compilation process, from errors that would involve Polonius. The source
 code of the packages was then translated to Polonius input files for a total of
 340~GBs~of tuples for 3~939~171~Rust functions (user-written as well as
-compiler-generated), which we used to measure Polonius solve-time performance as
+compiler-generated), which we used to measure Polonius runtime performance as
 well as for finding common patterns in the input data. Only complete data sets
 were considered; a repository with more than one target where at least one
 target did not compile was discarded, as was any repository where the analysis
@@ -1659,16 +1663,17 @@ in too many outliers for the plots to be readable.
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/solvetimes_boxplot.pdf}
-  \caption{A box plot showing the distribution of solve-times per function for
-    three implementations of Polonius. As can be seen here, the vast majority
-    execute very quickly.}
+  \caption[Runtimes Per Function for Three Polonius Variants]{A box plot
+    showing the distribution of runtimes per function for three
+    implementations of Polonius. As can be seen here, the vast majority execute
+    very quickly.}
   \label{fig:solvetimes}
 \end{figure}
 
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/solvetimes_boxplot_over_1s.pdf}
-  \caption{A box plot showing the distribution of solve-times per function for
+  \caption[Runtimes Per Function for Two Polonius Variants on Longer-Running Inputs]{A box plot showing the distribution of runtimes per function for
     the two optimised Polonius implementations on just functions that executed
     in between 1--50s on \textsc{Naive}.}
   \label{fig:solvetimes-long}
@@ -1677,10 +1682,10 @@ in too many outliers for the plots to be readable.
 \subsection{Performance}\label{sec:inputs:performance}
 
 In general, all three algorithms finished quickly for almost all functions, with
-both of the optimised algorithms already showing improvements in solve-times, as
+both of the optimised algorithms already showing improvements in runtimes, as
 seen in Figure~\ref{fig:solvetimes}. Apparently, \textsc{Naive} has a wider
-spread of solve-times than the others. Additionally, geometric means of the
-observed solve-times show improvements from hybridisation
+spread of runtimes than the others. Additionally, geometric means of the
+observed runtimes show improvements from hybridisation
 (Figure~\ref{fig:solvetimes-gmean-repo}), though it should be noted that the
 algorithm's worst-case of an input that fails both the simple and the full
 analysis was left out of the sample as that would have failed compilation,
@@ -1690,8 +1695,8 @@ implementation even when excluding smaller inputs~\ref{fig:solvetimes-long}.
 
 \begin{figure}
   \includegraphics[width=0.5\linewidth]{Graphs/solvetimes_repo_gmean.pdf}
-  \caption{Geometric means of the solve-times per repositoriy and
-    implementation.}
+  \caption[Geometric Means of Runtimes Per Repository]{Geometric means of the
+    runtimes per repositoriy and implementation.}
   \label{fig:solvetimes-gmean-repo}
 \end{figure}
 
@@ -1700,13 +1705,15 @@ implementation even when excluding smaller inputs~\ref{fig:solvetimes-long}.
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/input_sizes_boxplot.pdf}
-  \caption{A box plot showing the distribution of the various input sizes.}
+  \caption[Distribution of Polonius Input Tuple Sizes]{A box plot showing the
+    distribution of the various input sizes.}
   \label{fig:input-sizes}
 \end{figure}
 
 \begin{figure}
   \includegraphics[width=0.5\linewidth]{Graphs/var_drop_used_size_dist.pdf}
-  \caption{A plot showing the distribution of \InDatalog{var_drop_used}.}
+  \caption[Distribution of Input Sizes for the \InDatalog{var_drop_used} Fact]{A
+    plot showing the distribution of \InDatalog{var_drop_used}.}
   \label{fig:input-var-drop-used}
 \end{figure}
 
@@ -1725,12 +1732,12 @@ use complicated reference-sharing, typically only manipulating a few references.
 
 This points towards a need to have a low starting overhead for Polonius, as
 much of its analysis would have to be performed on very small inputs, where the
-solve-time would be dominated by a high constant setup time.
+runtime would be dominated by a high constant setup time.
 
 However, repositories can be assumed to be typically compiled all at once.
 Therefore, it is also interesting to say something about the maximum input size
 per repository, under the assumption that few large functions would dominate the
-solve-time for that repository. After collecting the maximum values per repository,
+runtime for that repository. After collecting the maximum values per repository,
 the median number of loans was~24, and the median number of potential drop-uses
 was~45 (regular uses was, for comparison, 177).
 
@@ -1740,16 +1747,17 @@ results were unusable as the inputs had no visually discernible patterns in
 neither 2 nor 3 dimensions, suggesting that most inputs are in some sense
 typical, or that PCA is ineffective here.
 
-\subsection{How Inputs Affect Solve-Time}\label{sec:inputs:correlation}
+\subsection{How Inputs Affect Runtime}\label{sec:inputs:correlation}
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/corr_heatmap.pdf}
-  \caption{Heatmap of Pearson~correlations between various input size metrics
-    and solve-times for all three Polonius implementations, suggesting in
-    particular that variable uses, number of variables, and the number of
-    provenance variables heavily affect runtime.}
+  \caption[Heatmap of Input Sizes Affecting Runtime]{Heatmap of
+    Pearson~correlations between various input size metrics and runtimes for
+    all three Polonius implementations, suggesting in particular that variable
+    uses, number of variables, and the number of provenance variables heavily
+    affect runtime.}
   \label{fig:corr-heatmap}
 \end{figure}
-A heatmap of the (Pearson) correlation between input size and solve-time for the
+A heatmap of the (Pearson) correlation between input size and runtime for the
 various variants on long-running jobs (as previously defined to be jobs taking
 at least 1s and no more than 50s to run under \textsc{Naive}) can be seen in
 Figure~\ref{fig:corr-heatmap} and Table~\ref{tab:correlations}, while a scatter
@@ -1758,9 +1766,10 @@ inputs can be seen in Figure~\ref{fig:input-scatter}.
 
 \begin{table}[ht]
   \input{correlations.tex}
-  \caption{Pearson correlations between size of inputs and the runtime of
-    \textsc{Naive}, \textsc{Hybrid}, and \textsc{DatafrogOpt} respectively, from
-    high correlation to \textsc{DatafrogOpt} runtime to low.}
+  \caption[Pearson Correlations Between Sizes of Inputs and Runtime]{Pearson
+    correlations between size of inputs and the runtime of \textsc{Naive},
+    \textsc{Hybrid}, and \textsc{DatafrogOpt} respectively, from high
+    correlation to \textsc{DatafrogOpt} runtime to low.}
   \label{tab:correlations}
 \end{table}%
 
@@ -1775,16 +1784,18 @@ impact on runtime than its number of edges, reflecting that complex CFGs with
 many branchings take more time to compute than linear ones.
 
 Both results suggest only a weak linear relation between input sizes and
-and the solve-time with \textsc{Naive}, while a clearer relation can be
+and the runtime with \textsc{Naive}, while a clearer relation can be
 found between \textsc{DatafrogOpt} and input sizes respectively. \textsc{Naive},
 on the other hand, does not show similarly clear correlations between runtime
 and input sizes of any kind (Table~\ref{tab:correlations}).
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/corr_scatter.pdf}
-  \caption{Scatter plot of solve-times under the naive and optimised algorithms
-    compared to variables and CFG edge count after having pruned extreme values
-    (runtimes below 1~s or above 13~minutes). Y~axis is runtime in seconds.}
+  \caption[Scatter Plot of Runtimes On Two Polonius Variants vs. nr. of CFG
+  Edges and Variables]{Scatter plot of runtimes under the naive and optimised
+    algorithms compared to variables and CFG edge count after having pruned
+    extreme values (runtimes below 1~s or above 13~minutes). Y~axis is runtime
+    in seconds.}
   \label{fig:input-scatter}
 \end{figure}
 
@@ -1852,10 +1863,11 @@ analysis.
 
 \begin{figure}
   \includegraphics[width=\linewidth]{Graphs/polonius-refactor}
-  \caption{A suggestion for how the Polonius fact generation in Rust can be
-    reorganised. Green boxes show inputs, black boxes Rust modules, and red
-    modules (re)moved components. Note that boxes are grouped together according
-  to the inputs necessary for producing them.}
+  \caption[Suggested Refactoring for the Polonius Fact Generation in Rust]{A
+    suggestion for how the Polonius fact generation in Rust can be reorganised.
+    Green boxes show inputs, black boxes Rust modules, and red modules (re)moved
+    components. Note that boxes are grouped together according to the inputs
+    necessary for producing them.}
   \label{fig:fact-refactor}
 \end{figure}
 
