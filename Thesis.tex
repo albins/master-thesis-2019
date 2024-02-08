@@ -376,7 +376,13 @@ notable exceptions including vectors and arrays.
 \section{The Borrow Check in the Rust Compiler}
 \label{sec:rust-specificts}
 
-\fixme{A nice diagram of the Rust compilation process here!}
+\begin{figure}
+  \includegraphics[width=0.9\linewidth]{Graphs/rustc-overview}
+  \caption{An overview of the Borrow Check's place in the process of compiling
+    Rust code, as described in the Rust Developer's
+    Guide~\cite{rustc_developers_guide_nodate}.}
+  \label{fig:rustc-overview}
+\end{figure}
 
 The logic of the borrow check as described in
 Section~\ref{sec:reference-provenance} is calculated at the level of an
@@ -390,11 +396,10 @@ on the right-hand side.
 
 \begin{figure}
   \includegraphics[width=0.65\linewidth]{Graphs/mir-example}
-  \caption{A graph rendering of the \InRust{main()} function from the small Rust
-  program in Listing~\ref{lst:mir-example-input}, illustrating branching (block 0) and
-  return from a function call (5). It is worth noting the Unwind arm of the
-  function, which would be called if the function call would have failed
-  (panicked).}
+  \caption{A graph rendering of the \InRust{main()} function from the Rust
+    program in Listing~\ref{lst:mir-example-input}, illustrating branching
+    (block 0), and a function call (5). Note the \texttt{unwind}~arm of block~5's
+    terminator (last line), which will be followed if the function call panics.}
   \label{fig:mir-example}
 \end{figure}
 
@@ -405,22 +410,10 @@ blocks~\cite{mir_rfc,rustc_developers_guide_nodate}. A rendering of the MIR of
 the program in Listing~\ref{lst:mir-example-input} can be seen in
 Figure~\ref{fig:mir-example}.
 
-% Removed because we never actually calculate these in the report
-% \fixme{Rust uses \emph{supporting prefixes} to refer to the parts of a variable
-%   access path touched by a dereferencing in the MIR~\cite{noauthor_rfc_2019}.
-%   This becomes important when determining which parts of a reference to consider
-%   under borrowing constraints. For example, given a tuple with a reference
-%   \InRust{r: (&(i32, i64), (f32, f64))}, the path \InRust{(*r.0).1} has type
-%   \InRust{i64} and the supporting prefixes \InRust{(*r.0).1} and \InRust{*r.0}
-%   (\InRust{*} has a low precedence and so it \InRust{*r.0} is the same as
-%   \InRust{*(r.0)}). Similarly, the path \InRust{r.1.0} has the supporting
-%   prefixes \InRust{r.1.0}, \InRust{r.1}, and \InRust{r}}.
-
-
 \begin{sourcecode}
-  \captionof{listing}{A small (and meaningless) Rust program to illustrate
-    MIR~output, featuring branching and a function
-    application.}\label{lst:mir-example-input}
+  \captionof{listing}{A minimal Rust program featuring branching and a function
+    call. The MIR~form of this program is shown in
+    Figure~\ref{fig:mir-example}.}\label{lst:mir-example-input}
 \begin{minted}{rust}
 fn main() {
     let x = 17;
