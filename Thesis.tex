@@ -350,6 +350,29 @@ Most of these examples are borrowed from
 \end{description}
 
 
+\subsection{Variables, Places, and Paths}
+\label{sec:vars-places-paths}
+
+A notable detail of the borrow check is what is meant by a ``variable''. In
+Rust, some data structures, such as \InRust{struct}s, and tuples, are analysed
+at the granularity of the individual components, which may have arbitrarily deep
+nesting (known at compile-time). This means that the following code, for
+example, \emph{does} pass the borrow check, as the loans don't overlap:
+\begin{minted}{rust}
+struct Point(u32, u32);
+
+let mut pt: Point = Point(6, 9);
+let x = &mut pt.0;
+let y = &mut pt.1;
+// no error; our loans don't overlap!
+\end{minted}
+
+In our instance, the root variable \InRust{pt} contains the \emph{paths}
+\InRust{pt.1} and \InRust{pt.2}. Such paths constitute a tree with its root in
+the variable itself. Both the core borrow check and the initialisation tracking
+that we will discuss reasons about variables on the path level, with some
+notable exceptions including vectors and arrays.
+
 \section{The Borrow Check in the Rust Compiler}
 \label{sec:rust-specificts}
 
@@ -360,7 +383,8 @@ Representation (MIR), corresponding to the basic blocks of program control flow.
 The input data to the Polonius solver is generated in the Rust compiler by
 analysing this intermediate representation. This means that we can safely assume
 to be working with simple variable-value assignment expressions, of the type
-\InRust{_1 = _2}.
+\InRust{_1 = _2}, as opposed to complex expressions involving multiple variables
+on the right-hand side.
 
 % Removed because we never actually calculate these in the report
 % \fixme{Rust uses \emph{supporting prefixes} to refer to the parts of a variable
@@ -440,7 +464,7 @@ valid if~$\pi$ is the only name for that value and removes that value from the
 environment, effectively deallocating it.
 
 \begin{equation}\label{eq:t-move}
-    \ntyperule{\Gamma \vdash_{\text{mut}} \pi : \tau^s \:\: \text{noncopyable } \tau^s}{\Sigma ; \Delta ; \Gamma \vdash \expression{\pi} : \tau^s \implies \Gamma - \pi}
+  \ntyperule{\Gamma \vdash_{\text{mut}} \pi : \tau^s \:\: \text{noncopyable } \tau^s}{\Sigma ; \Delta ; \Gamma \vdash \expression{\pi} : \tau^s \implies \Gamma - \pi}
   \end{equation}
 
   The second rule, Rule~\ref{eq:t-borrow}, tells that we may create an
