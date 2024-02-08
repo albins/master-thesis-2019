@@ -1611,18 +1611,18 @@ because a drop-use would only happen if the \InRust{x} was initialised on
     not transitive!}\label{lst:use-live}
 \begin{minted}{prolog}
 var_maybe_initialized_on_entry(V, Q) :-
-    var_initialized_on_exit(V, P),
+    var_maybe_initialized_on_exit(V, P),
     cfg_edge(P, Q).
 
 var_drop_live(V, P) :-
     var_drop_used(V, P),
-    var_initialzed_on_entry(V, P).
+    var_maybe_initialzed_on_entry(V, P).
 
 var_drop_live(V, P) :-
     var_drop_live(V, Q),
     cfg_edge(P, Q),
     !var_defined(V, P)
-    var_initialized_on_exit(V, P).
+    var_maybe_initialized_on_exit(V, P).
 \end{minted}
 \end{sourcecode}
 
@@ -1669,10 +1669,10 @@ region_live_at(R, P) :-
     \InDatalog{path_accessed_at(Path, Point)} & F, I & This move path is used in an expression here.\\
     \InDatalog{moved_out_at(Path, P)} & F, I & This path was moved from this scope in an expression here. \\
     \InDatalog{ancestor(Above, Below)} & I & \InDatalog{Above} is a prefix of \InDatalog{Below}.\\
-    \InDatalog{path_init_lub_exit(Path, Point)} & I & \InDatalog{Path} is initialized without subsequent deinitialisation on one or more branches reaching this CFG node (lowest upper bound on set membership).\\
-    \InDatalog{var_init_glb_entry(Var, Point)} & I & This variable is initialised on all branches reaching this CFG node (greatest lower bound on membership). \\
-    \InDatalog{path_moved_lub_exit(Path, Point)} & I & \InDatalog{Path} has been moved without subsequent reinitialisation on at least one branch reaching this CFG node. \\
-    \InDatalog{var_init_lub_exit(V, Point)} & O & This variable is initialised along at least one branch reaching this node at the time of its exit. \\
+    \InDatalog{path_maybe_init...exit(Path, Point)} & I & \InDatalog{Path} is initialized without subsequent deinitialisation on one or more branches reaching this CFG node (lowest upper bound on set membership).\\
+    \InDatalog{path_definitely_init...(Path, Point)} & I &  \InDatalog{Path} is initialised on all branches reaching \InDatalog{Point} (greatest lower bound on membership). \\
+    \InDatalog{path_maybe_mov...(Path, Point)} & I & \InDatalog{Path} has been moved without subsequent reinitialisation on at least one branch reaching this CFG node. \\
+    \InDatalog{var_maybe_init...(Var, Point)} & O & This variable is initialised along at least one branch reaching this node at the time of its exit. \\
     \InDatalog{move_error(Path, Point)} & O & Error: \InDatalog{Path} is accessed here, but may have been moved, or was never initialised. \\
   \end{tabular}
 \caption{Move Analysis Dramatis Personae}
@@ -1812,21 +1812,34 @@ and~\ref{lst:path-maybe-moved} (possibly deinitialised paths).
 
 \begin{sourcecode}
   \captionof{listing}{A move error is a path access to any path that is not
-    provably initialised.}\label{lst:move-error}
+    provably initialised. We use a one-off relation here to move the point of
+    the error one node ahead from the last provably initialised point. This is
+    because if a path is initialised on \textit{exit} from some statement, it is
+    still initialised on \textit{entry} to the next one, which would correspond
+    to the point where the evaluation (but not the effect) of the statement
+    happens. Without this ``rolling up'', we would have a move error on every
+    statement that moves a path, as that statement also accesses the path it
+    moves. With these rules, the path would be accessed at the starting-poing of
+    the move statement, and moved at mid-point, thus avoiding generating an
+    error where they overlap.}\label{lst:move-error}
 \begin{minted}{prolog}
 move_error(Path, Point) :-
     path_accessed_at(Path, Point),
-    !path_definitely_initialized_at(Path, Point).
+    !path_definitely_initialized_on_entry(Path, Point).
+
+path_definitely_initialized_on_entry(Path, Q) :-
+    path_definitely_initialized_on_exit(Path, P),
+    cfg_edge(P, Q).
 \end{minted}
 \end{sourcecode}
 
 \begin{sourcecode}
   \captionof{listing}{A path is provably initialised if may be initialised and
-    may not have been moved.}\label{lst:path-definitely-initialised}
+    has definitely not been moved.}\label{lst:path-definitely-initialised}
 \begin{minted}{prolog}
-path_definitely_initialized_at(Path, Point) :-
+path_definitely_initialized_on_exit(Path, Point) :-
    path_maybe_initialized_on_exit(Path, Point),
-   !path_maybe_moved_at(Path, Point).
+   !path_maybe_moved_on_exit(Path, Point).
 \end{minted}
 \end{sourcecode}
 
@@ -1835,10 +1848,10 @@ path_definitely_initialized_at(Path, Point) :-
     \InDatalog{Point} if it was moved on the way there without being
     subsequently reinitialised.}\label{lst:path-maybe-moved}
 \begin{minted}{prolog}
-path_maybe_moved_at(Path, Point) :- moved_out_at(Path, Point).
+path_maybe_moved_on_exit(Path, Point) :- moved_out_at(Path, Point).
 
-path_maybe_moved_at(Path, Point2) :-
-    path_maybe_moved_at(Path, Point1),
+path_maybe_moved_on_exit(Path, Point2) :-
+    path_maybe_moved_on_exit(Path, Point1),
     cfg_edge_(Point1, Point2)
     !initialized_at(Point1, Point2).
 \end{minted}
