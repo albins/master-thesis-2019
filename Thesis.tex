@@ -575,7 +575,7 @@ Under these rules, a Rust function is valid from the perspective of the borrow
 check if, for each point in the control flow graph, the borrow rules are
 respected. In logic terms, this means that we cannot find a point $p$ in the
 control-flow graph such that a loan $\Loan$ is live there while its conditions
-are being validated, or more formally $\lnot \exists(\Loan, p) \: : \:
+are being violated, or more formally $\lnot \exists(\Loan, p) \: : \:
 \Live(\Loan, p) \land \Invalidated(\Loan, p))$. These relations are then defined
 as follows:
 \begin{description}
@@ -784,6 +784,10 @@ The following short-hand names are used:
   to \InRust{v}.
 \item[$P, Q$] are points in the control-flow graph of the function under analysis.
 \item[$V$] is a variable.
+\item[$M$] is a Move Path, that is a part of a variable that can be accessed
+  and, more importantly, deinitialised. This can be the name of a variable (e.g.
+  \InRust{a}), or an access of a field of a data structure or one of a tuple's
+  projections (e.g. \InRust{a.b}, or \InRust{a.1}).
 \end{description}
 
 
@@ -824,6 +828,15 @@ The following short-hand names are used:
   provenance~$R$, and~$V$ also implements a custom drop method which might need
   all of~$V$'s data, as discussed in Section~\ref{sec:deall-as-spec}.
 \end{description}
+
+
+\fixme{Update this list for initialisation tracking!}
+
+\subsubsection{Emitting Facts from the Rust Compiler}\label{sec:sec-rustc-fact-generation}
+
+\fixme{A nice illustration of where we hook into the code and what happens there}
+
+\fixme{A description of how and where facts are generated.}
 
 \subsection{Variable Initialisation}
 \label{sec:var-initalisation}
