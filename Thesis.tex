@@ -142,6 +142,7 @@
 % }
 
 \usepackage{xparse}
+\usepackage{epigraph}
 %
 \DeclarePairedDelimiterX{\Set}[1]{\{}{\}}{\setargs{#1}}
 \NewDocumentCommand{\setargs}{>{\SplitArgument{1}{;}}m}
@@ -220,11 +221,54 @@ reference-analysis part of the borrow check.
   \listoffigures
   \listoftables
 \endgroup
-  
-%\section*{Acknowledgements}
+  \newpage
+\section*{Acknowledgements}
+\epigraph{We seek not the knowledges ruled by phallogocentrism (nostalgia for
+  the presence of the one true Word) and disembodied vision. We seek those ruled
+by partial sight and limited voice--not partiality for its own sake but, rather,
+for the sake of the connections and unexpected openings situated knowledges make
+possible. Situated knowledges are about communities, not about isolalted
+individuals. \textbf{The only way to find a larger vision is to be somewhere in
+  particular} [emphasis mine].}%
+{Donna Haraway, \citetitle{haraway}~(\citeyear{haraway})}
+
+{\footnotesize Being easily confused about the reality of the world, one of my
+  epistemologic touchstones is Donna Haraway's classic notion of
+  \textit{situated knowledges}, as formulated in the quote above and published
+  the year I was born~\cite{haraway}. I do not pretend to understand everything
+  she wrote, but the core idea of situating knowledge within somewhere has
+  always stuck with me.
+
+It is not by accident I do not work at a software company and hope I never will
+again. I have sampled their ontologies and epistemologies, and they are poison.
+The IT industry as a whole is such an affront to humanity I often think it would
+have been better if we never invented computers at all. I will never produce
+knowledge for the Facebooks, Googles, or Microsofts of the world if I can help
+it. Computers help us produce effect from almost pure thougth. Look at what they
+made of it!
+
+At the time of writing Rust is very young. Despite this, it still has a
+surprisingly large fan base. The Rust Book~\cite{nichols_rust_nodate} notes that
+``...the Rust programming language is fundamentally about empowerment: no matter
+what kind of code you are writing now, Rust empowers you to reach farther, to
+program with confidence in a wider variety of domains than you did before''. It
+is around this notion, that systems programming can be \emph{fun}, that we
+\emph{can make new languages}, and so on, that Rust's sometimes eclectic
+community has grown.
+
+In no other computer-associated community have I found so many non-binary trans
+cyber-witches, hackers, punks, philosophers, and anarchists. At times, working
+on the Rust compiler has felt a lot more like a utopian project than it has any
+right to. Being in this community felt like my early memories of the Internet,
+before it all got first boring (ca 2004--2007), and then dystopian (2013--2015
+and onwards).
+
+It is within this community I want to place my work. Thank you, for reminding me
+that these stupid machines are supposed to be \emph{fun}.
+}
 
 \chapter{Introduction}
-%\epigraph{\fixme{short quote}}
+\epigraph{\fixme{short quote}}{hello}
 %\mainmatter{}
 Rust is a young systems programming language originally developed at Mozilla
 Research~\cite{matsakis_rust_2014}. Its stated intention is to combine
