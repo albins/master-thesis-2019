@@ -312,7 +312,6 @@ shared memory.
 % say something about Polonius contributions: first EDSL of Datalog in a
 % production language
 
-
 The contributions made in this thesis specifically include the implementation of
 liveness and initialisation calculations (Sections~\ref{sec:liveness}
 and~\ref{sec:move-analysis} respectively) in Polonius, previously computed in an
@@ -340,6 +339,7 @@ account of Polonius design, implementation, and operation.
 % reason about them as they would any other type.
 
 
+
 % This reference to NLLs is unclear; probably just drop it.
 % {\sloppy
 % Since its release, the Rust compiler has been extended through proposal RFC~2094
@@ -359,6 +359,8 @@ account of Polonius design, implementation, and operation.
 
 %\section{Variables, Places, and Paths}
 %\label{sec:vars-places-paths}
+
+\fixme{Rust uses traits~\cite{scharli2003traits}.}
 
 A notable detail of the borrow check is what is meant by a ``variable''. In
 Rust, some data structures, such as \InRust{struct}s (complex data types,
@@ -394,13 +396,12 @@ borrow check itself.
 
 % quickly introduce borrow check, forward-refer
 
-Rust's memory safety guarantees are strictly speaking part of its type system
-(as further discussed in Section~\ref{sec:type-system}), but is verified in a
-separate step of the compilation process (see Chapter~\ref{fixme}) . This step
-is referred to as as the \textit{borrow check}, and the component of the
-compiler that performs it the \textit{borrow checker}. The specific rules
-enforced by the borrow checker are discussed in the next chapter
-(Chapter~\ref{cha:borrowing-rules}).
+Rust's memory safety guarantees are part of its type system (as further
+discussed in Section~\ref{sec:type-system}), but is verified in a separate step
+of the compilation process (see Chapter~\ref{fixme}), called the \textit{borrow
+  check}. Unsurprisingly, the part of the compiler that performs it is fittingly
+called the \textit{borrow checker}. The specific rules enforced by the borrow
+checker are discussed in the next chapter (Chapter~\ref{cha:borrowing-rules}).
 
 Due to limitations in its formulation, the current borrow checker rejects code
 such as the one in Listing~\ref{lst:motivating-example}, as it is unable to prove that
@@ -1026,7 +1027,7 @@ used in Polonius can be found in Table~\ref{tab:input-atoms}.
     Provenance variable\notmine & \InRust{'a} & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
     Point\notmine & \InRust{Mid(bb1[5])} & A point in the control-flow graph. \\
     Move path & \InRust{x.y.z} & A precise field that can be accessed into a variable; a field in a struct or a projection in a tuple. \\
-    Variable & \InRust{x} & \\
+    Variable & \InRust{x} & A MIR (or Rust) variable. \\
   \end{tabular}
 \caption[Polonius Atoms]{The atoms used in Polonius. Variables and move paths
   were introduced as part of this thesis.}
@@ -1395,6 +1396,30 @@ live loan (an observed tree falls in the woods, thus making a sound).
 
 
 \section{Liveness, as Experienced by Polonius}\label{sec:liveness}
+
+{ \renewcommand{\arraystretch}{1.0}
+\begin{table}[h]
+  \begin{tabular}{@{}l l m{5.5cm}}
+    Atom/Fact & Type & Description \\ \hline
+    Provenance\notmine & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine & Atom & A point in the control-flow graph. \\
+    Variable & Atom & A MIR (or Rust) variable. \\
+    \InDatalog{cfg_edge(P, Q)}\notmine & Fact & A transition in the CFG. \\
+    \InDatalog{var_used(Var, Point)} & Fact & A regular variable use happens here.\\
+    \InDatalog{var_defined(Var, Point)} & Fact & A variable is assigned here.\\
+    \InDatalog{var_uses_region(Var, Provenance)} & Fact & Connects provenance variables from types to their variables.\\
+    \InDatalog{var_drops_region(Var, Provenance)} & Fact & Deallocating this variable indirectly uses this provenance variable. \\
+    \InDatalog{var_initialized_on_entry(V, Point)} & Fact & This variable is initialised on entry to this CFG node. \\
+    \InDatalog{var_drop_live(Var, Point)} & Intermediate & This variable is used in a drop. \\
+    \InDatalog{var_use_live(Var, Point)} & Intermediate & This variable is used in an expression. \\
+    \InDatalog{region_live_at(Provenance, Point)} & Output & This provenance variable is live at this point, and the conditions of its loan must be accepted. \\
+  \end{tabular}
+\caption[Liveness Dramatis Personae]{Liveness Dramatis Personae.}
+  \label{tab:liveness-facts-recap}
+\end{table}%
+}
+
+
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/liveness.pdf}
   \caption[MIR Fragment with Inputs and Outputs of the Liveness Analysis]{A
@@ -1538,18 +1563,18 @@ because a drop-use would only happen if the \InRust{x} was initialised on
     not transitive!}\label{lst:use-live}
 \begin{minted}{prolog}
 var_maybe_initialized_on_entry(V, Q) :-
-    var_maybe_initialized_on_exit(V, P),
+    var_initialized_on_exit(V, P),
     cfg_edge(P, Q).
 
 var_drop_live(V, P) :-
     var_drop_used(V, P),
-    var_maybe_initialzed_on_entry(V, P).
+    var_initialzed_on_entry(V, P).
 
 var_drop_live(V, P) :-
     var_drop_live(V, Q),
     cfg_edge(P, Q),
     !var_defined(V, P)
-    var_maybe_initialized_on_exit(V, P).
+    var_initialized_on_exit(V, P).
 \end{minted}
 \end{sourcecode}
 
@@ -1580,6 +1605,28 @@ region_live_at(R, P) :-
 \end{sourcecode}
 
 \section{Move Analysis}\label{sec:move-analysis}
+
+{ \renewcommand{\arraystretch}{1.0}
+\begin{table}[h]
+  \begin{tabular}{@{}l l m{5.5cm}}
+    Atom/Fact & Type & Description \\ \hline
+    Provenance\notmine & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine & Atom & A point in the control-flow graph. \\
+    Variable & Atom & A MIR (or Rust) variable. \\
+    Path & Atom & A move path. \\
+    \InDatalog{cfg_edge(P, Q)}\notmine & Fact & A transition in the CFG. \\
+    \InDatalog{child(Path2, Path1)} & Fact & This path is nested under another path. \\
+    \InDatalog{initialized_at(Path, P)} & Fact & This path was given a value here. \\
+    \InDatalog{path_belongs_to_var(Path, V)} & Fact & This path is the root path of variable $V$. \\
+    \InDatalog{moved_out_at(Path, P)} & Fact & This path was moved from this scope in an expression here. \\
+    \InDatalog{path_initialized_on_exit(Path, Point)} & Intermediate & This move path is initialized on exit from this CFG node.\\
+    \InDatalog{var_initialized_on_exit(V, Point)} & Output & This variable is initialised on exit from this CFG node. \\
+  \end{tabular}
+\caption{Move Analysis Dramatis Personae}
+  \label{tab:move-facts-recap}
+\end{table}%
+}
+
 The idea behind variable initialisation calculations is a fairly straightforward
 transitive closure computation. Initialisation for a path propagates forwards
 from an initialisation event across the CFG until the path is deinitialised. As
@@ -1630,6 +1677,27 @@ var_maybe_initialized_on_exit(V, P) :-
 \end{minted}
 \end{sourcecode}
 \section{Loan Constraint Propagation\notmine{}}\label{sec:loan-constr-prop}
+
+{ \renewcommand{\arraystretch}{1.0}
+\begin{table}[h]
+  \begin{tabular}{@{}l l m{5.5cm}}
+    Atom/Fact & Type & Description \\ \hline
+    Provenance\notmine & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
+    Point\notmine & Atom & A point in the control-flow graph. \\
+    Loan\notmine & Atom & A unique borrow expression. \\
+    \InDatalog{cfg_edge(P, Q)}\notmine & Fact & A transition in the CFG. \\
+    \InDatalog{region_live_at(Provenance, Point)} & Fact & This provenance variable is live at this point, and the conditions of its loan must be accepted. \\
+    \InDatalog{borrow_region(Provenance, Loan, Point)}\notmine & Fact & A borrow expression at this point creates this loan and this provenance variable. \\
+    \InDatalog{invalidates(Point, Loan)}\notmine & Fact & An operation at this point would violate this loan if it were live. \\
+    \InDatalog{subset(Provenance1, Provenance2)}\notmine & Intermediate & There is a subset relationship between two provenances at this point. \\
+    \InDatalog{requires(Provenance, Loan, Point)}\notmine & Intermediate & This provenance contains this loan at this point. \\
+    \InDatalog{loan_live_at(Loan, Point)}\notmine & Intermediate & This loan is live at this point. \\
+    \InDatalog{error(Point)}\notmine & Output & A borrow check error (a violated loan) occurred at this point. \\
+    
+  \end{tabular}
+\caption{Loan Constraint Propagation Dramatis Personae}
+  \label{tab:polonius-facts-recap}
+\end{table}%
 
 The first relation used in Polonius is the \InDatalog{subset(R1, R2, P)}
 relation, which states that~$R_1 \subseteq R_2$ for two provenance
