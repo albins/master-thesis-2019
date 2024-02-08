@@ -1495,7 +1495,7 @@ In Listing~\ref{lst:datafrog:var-live}, we can see a leapjoin populating
 \InRust{var_use_live_var} with tuples produced by joining the \InRust{Relation}s
 representing \InRust{var_defined_rel} and the reversed CFG.
 
-\section{Why Datalog?}\label{sec:why-datalog}
+\section{Datalog: a Natural Choice for Polonius}\label{sec:why-datalog}
 
 The most obvious reason why we chose Datalog for Polonius lies in the intuition
 developed in Section~\ref{sec:borrow-check-intuition}. If Polonius is a bunch of
@@ -1590,7 +1590,7 @@ intermediary relations introduced along the way.
 
 But first, we need to clarify a detail we have previously glossed over, namely:
 
-\section{What Is Being Borrowed and Moved?}\label{sec:paths}
+\section{Analysing Complex Data Structures}\label{sec:paths}
 
 The borrow check specifically tracks memory at the resolution of \textit{paths},
 that is paths to concrete memory. Examples of paths is \InRust{x} (a variable on
@@ -2513,7 +2513,7 @@ error(P) :-
 \end{minted}
 \end{sourcecode}
 
-\section{What is Missing from Polonius?}\label{sec:missing-features}
+\section{Missing Features in Polonius}\label{sec:missing-features}
 
 In addition to polish, comprehensive benchmarking, and performance
 optimisations, all discussed later, there are three important features missing
