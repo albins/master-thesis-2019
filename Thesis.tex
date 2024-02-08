@@ -1499,11 +1499,8 @@ which branch is taken. We refer to this type of liveness as
 \textit{use-liveness}, owing to the fact that the liveness comes from variable
 use.
 
+\begin{figure}
 \begin{sourcecode}
-  \captionof{listing}{The rules for calculating use-liveness: a variable is
-    use-live if it was used at a point $P$, or if it was live in $Q$, there is a
-    transition $P\rightarrow{}Q$, and it was not defined (killed) in
-    $P$.}\label{lst:var-live}
 \begin{minted}{prolog}
 var_use_live(V, P) :- var_used(V, P).
 
@@ -1513,6 +1510,40 @@ var_use_live(V, P) :-
     !var_defined(V, P).
 \end{minted}
 \end{sourcecode}
+
+{ \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{@{}l l}
+      Positive & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{var_used(x, Start(bb0[1]))}\\
+                     \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}
+                   \end{tabular} &%
+                                   
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{var_use_live(x, Mid(bb0[0]))} \\
+                     \InRust{var_use_live(x, Start(bb0[1]))}
+                   \end{tabular}
+                       
+                 \end{tabular}\\
+      Negative & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{var_use_live(x, Start(bb0[1]))}\\
+                     \InRust{var_defined(x, Mid(bb0[0]))}\\
+                     \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}
+                   \end{tabular} &%
+                                   (nothing)
+                 \end{tabular}\\
+    \end{tabular}    
+  }
+
+  \caption[Rules for Calculating Use-Liveness]{The rules for calculating
+    use-liveness: a variable is use-live if it was used at a point $P$, or if it
+    was live in $Q$, there is a transition $P\rightarrow{}Q$, and it was not
+    defined (killed) in $P$.}\label{fig:var-use-live}
+
+\end{figure}
 
 \subsection{Deallocation As a Special Case of Variable Use}
 \label{sec:deall-as-spec}
