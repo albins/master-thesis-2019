@@ -452,13 +452,15 @@ section.
 
 \section{Reference Ownership as a Type System}\label{sec:type-system}
 
-Summing up the ongoing work of \citeauthor{weiss_oxide:_2019} on formalising the
-reference ownership rules of Rust~\cite{weiss_oxide:_2019}. At the heart of the
-type system lies the flow-sensitive typing judgments seen in
-Rules~\ref{eq:t-move} and~\ref{eq:t-borrow}, both of
-\citeauthor{weiss_oxide:_2019}'s paper (Figure~1), with slight modifications.
+In this section, I will summarise the ongoing work of
+\citeauthor{weiss_oxide:_2019} on formalising the reference ownership rules of
+Rust~\cite{weiss_oxide:_2019} into a type system as it relates to the Polonius
+formulation of the borrow checker. At the heart of the type system lies the
+flow-sensitive typing judgments seen in Rules~\ref{eq:t-move}
+and~\ref{eq:t-borrow}, both of \citeauthor{weiss_oxide:_2019}'s paper
+(Figure~1), with slight modifications.
 
-The first rule (\ref{eq:t-move}) shows that for a given environment~$\Gamma$, a
+The first rule~\eqref{eq:t-move} shows that for a given environment~$\Gamma$, a
 move of a given variable~$\pi$ (occurring if $\pi$ cannot be copied) is only
 valid if~$\pi$ is the only name for that value and removes that value from the
 environment, effectively deallocating it.
@@ -467,7 +469,7 @@ environment, effectively deallocating it.
   \ntyperule{\Gamma \vdash_{\text{mut}} \pi : \tau^s \:\: \text{noncopyable } \tau^s}{\Sigma ; \Delta ; \Gamma \vdash \expression{\pi} : \tau^s \implies \Gamma - \pi}
   \end{equation}
 
-  The second rule, Rule~\ref{eq:t-borrow}, tells that we may create an
+  The second rule, Rule~\eqref{eq:t-borrow}, tells that we may create an
   $\omega$-reference to any variable where $\omega$-use is safe (either sharedly
   or uniquely), and produce a reference to that variable of the type ``reference
   to a value of $\pi$'s type,~$\tau$, with its provenance variable being the set
@@ -477,19 +479,32 @@ environment, effectively deallocating it.
   \ntyperule{\Gamma \vdash_{\omega} \pi : \tau}{\Sigma ; \Delta ; \Gamma \vdash \expression{\&\omega \pi} : \left \{ ^{\omega}\pi\right \} \omega \tau \implies \Gamma}
 \end{equation}
 
-\fixme{fudge the $\omega$-safety rules.}
+Judgments on the form~$\Gamma \vdash_{\omega} \pi \: : \: \tau$ mean that ``in
+the environment~$\Gamma$, it is safe to use the variable~$\pi$ (of type~$\tau$)
+$\omega$-ly'' \cite{weiss_oxide:_2019}. In other words, if $\omega$~is
+\emph{unique}, it means that there are no live loans of any paths
+overlapping~$\pi$, and of $\omega$~is \emph{shared} that there are no
+overlapping \emph{unique} loans in the provenance part of $\tau$.
 
-Both of these rules constitute ``base cases'' for the ownership system, showing
-how variables get removed from the environment, and how provenance variables in
-reference types are created. In order to describe the full analysis, I need to
-also consider how these relations extend across program execution through
-sequencing or branching, of which the latter introduces the approximate aspect
-of provenances. Finally, I will also describe how provenance variables
-come into relation with each other through type unification.
+Rules~\eqref{eq:t-move} and~\eqref{eq:t-borrow} constitute ``base cases'' for
+the ownership system, showing how variables get removed from the environment,
+and how provenance variables in reference types are created. In order to
+describe the full analysis, I need to also consider how these relations extend
+across program execution through sequencing or branching, of which the latter
+introduces the approximate aspect of provenances. Finally, I will also describe
+how provenance variables come into relation with each other through type
+unification.
 
-\fixme{describe the branching rules}
+Since the borrow check is performed on the MIR, we do not have branchings or
+function calls in the normal sense. Therefore, the sequencing and branching
+rules of Oxide only translate analogously~\cite{weiss_oxide:_2019}. As in Oxide,
+the ``type environment'' of the MIR is threaded through the typing of each
+expression, such that the sequence of expressions~$\expression{e_1; e_2}$ would
+first type-check~$e_1$ and then~$e_2$ in the resulting environment. To capture
+this, I will use the name~$\Gamma_p$ to refer to the type-environment mapping
+places to their types just before evaluating an arbitrary point~$p$ of the~CFG.
 
-\fixme{describe the sequencing rules}
+\fixme{describe the branching rules and how they come to be fixpoint calculations}
 
 \fixme{describe type unification}
 
@@ -604,12 +619,13 @@ relations as predicates, described as fixed input \emph{facts}, computed
 on facts or other relations. For example, defining a fact describing that an
 individual is another individual's parent might look like
 \InDatalog{parent(mary, john).}, while computing the \InDatalog{ancestor}
-relation could use the two rules \InDatalog{ancestor(X, Y) :- parent(X, Y).} and
-\InDatalog{ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).}, reflecting the fact
-that ancestry is respectively either parenthood or transitive parenthood
-(example from the Wikipedia article on Datalog~\cite{wiki:datalog}). This thesis
-uses the notation of Souffl{\'e}~\cite{scholz_fast_2016}.
-
+relation could then use the two rules, reflecting the fact that ancestry is
+respectively either direct parenthood or transitive parenthood (example from the
+Wikipedia article on Datalog~\cite{wiki:datalog}):
+\begin{minted}{rust}
+ancestor(X, Y) :- parent(X, Y).
+ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+\end{minted}
 
 Datafrog~\cite{datafrog} is a minimalist Datalog implementation embedded in
 Rust, providing an implementation of a worst-case optimal join algorithm as
@@ -675,7 +691,7 @@ into the target variable.
 
 For more complex joins where a single variable participates in the join and all
 other arguments are static \InRust{Relation}s (such as is the case with the
-variable \InRust{var_live_var} of Listing~\ref{lst:datafrog:var-live}), there is
+variable~\InRust{var_live_var} of Listing~\ref{lst:datafrog:var-live}), there is
 \InRust{from_leapjoin}. In this case, the input is the sole dynamic source
 variable, a tuple of ``leapers'', and a combining function like the one in
 \InRust{from_join}, but with the signature like the one above, mapping a matched
@@ -688,6 +704,10 @@ mapping tuples from the \InRust{Variable} to \InRust{Key}s in the
 \InRust{Relation} being (anti-)joined. In the case of \InRust{extend_anti}, any
 tuples matching \InRust{Key} are discarded.
 
+
+In this thesis, I will use the notation of Souffl{\'e}~\cite{scholz_fast_2016}
+for all examples for clarity and brevity, even though the actual code was
+written in Datafrog.
 
 \chapter{A Declarative Model for the Rust Borrow Checker}
 \label{cha:investigation}
