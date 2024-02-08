@@ -7,8 +7,7 @@ clean:
 	rm -rf _minted-Thesis
 
 Thesis.pdf: Thesis.tex bibliography.bib
-	source activate $(PYGMENTS_VENV) \
-	&& latexmk \
+	latexmk \
 		-pdf \
 		-xelatex \
     -shell-escape \
