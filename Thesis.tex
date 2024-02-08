@@ -1317,17 +1317,23 @@ Chapter~\ref{cha:implementation}.
   I will be brief.}{Polonius, illustrating the succinctness and clarity of
   Datafrog compared to Datafrog, in \textit{Hamlet}, Act-II, Scene-II}
 
-In this chapter, we will discuss Datalog, the language we use to express
-Polonius, and its implementation Datafrog. Datalog is a derivative of the logic
-programming language Prolog, with the desirable properties that any program
-terminates in polynomial time, and in some variants also with the power to
-express all polynomial-time computation~\cite{afrati_datalog_1995}. It describes
-fixpoint calculations over logical relations as predicates, described as fixed
-input \emph{facts} about objects, called \emph{atoms} (upper-case names),
-computed \emph{relations} (lower-case names), or \emph{rules} describing how to
-populate the relations based on facts or other relations. For example, defining
-a fact describing that an individual is another individual's child might look
-like \InDatalog{child(Mary, John).}, while computing the
+In this chapter, we will discuss the choice of implementation language for
+Polonius. As we have previously discussed (in
+Section~\ref{sec:borrow-check-intuition}) the borrow check and therefore
+Polonius is just a computation of transitive closures and set memberships across
+the control-flow graph. Following this intuition, we would like a language that
+can cleanly express such computations.
+
+It turns out that there is such a language; Datalog. Datalog is a derivative of
+the logic programming language Prolog, with the desirable properties that any
+program terminates in polynomial time, and in some variants also with the power
+to express all polynomial-time computation~\cite{afrati_datalog_1995}. It
+describes fixpoint calculations over logical relations as predicates, described
+as fixed input \emph{facts} about objects, called \emph{atoms} (upper-case
+names), computed \emph{relations} (lower-case names), or \emph{rules} describing
+how to populate the relations based on facts or other relations. For example,
+defining a fact describing that an individual is another individual's child
+might look like \InDatalog{child(Mary, John).}, while computing the
 \InDatalog{ancestor(Older, Younger)} relation could then use the two rules,
 reflecting the fact that ancestry is respectively either direct parenthood or
 transitive parenthood:
@@ -1338,21 +1344,78 @@ ancestor(Grandmother, Daughter) :-
     ancestor(Mother, Daughter).
 \end{minted}
 
-Datafrog~\cite{datafrog} is a minimalist Datalog implementation embedded in
-Rust, using a worst-case optimal join algorithm as described
-in~\cite{ngo_worst-case_2012}. The fact that Datafrog is embedded in Rust (an
-EDSL, or Embedded Domain-Specific Language) means that standard Rust language
-abstractions are used to describe the computation. Static facts are described as
-\InRust{Relation}s, while dynamic \InRust{Variable}s are used to capture the
-results of computations, both of which are essentially sets of tuples, in our
-case tuples of integers. Rules are described using a join with either a
-\InRust{Variable} or a \InRust{Relation}, with an optimised join method used for
-joins with only one variable, but multiple relations. Only single-step joins on
-the first tuple element are possible, which means that more complex rules must
-be written with intermediary variables, and manual indices created whenever a
-relation must be joined on a variable which is not the first in the tuple. An
-example of the \InDatalog{ancestor(Older, Younger)} relation in Datafrog can be
-seen in Listing~\ref{lst:datafrog:ancestor}.
+By reducing the expressive power of the programming language, Datalog enables a
+greater degree of automated optimisations of programs, including transferring
+the choice of data structures to the compiler. This means that compiler
+optimisations can massively improve the performance of user code, and is one of
+the reasons why \citeauthor{smaragdakis2019next} mentioned Datalog as an example
+of a next-paradigm programming language during the Onward! track of the 2019
+SPLASH conference~\cite{smaragdakis2019next}.
+
+\section{Datalog: a Natural Choice for Polonius}\label{sec:why-datalog}
+
+Being convenient for expressing computations of transitive closures, Datalog has
+a long history of use for static analysis. A notable recent example being
+the Souffl{\'e} system, which synthesises performant C++ code from the Datalog
+specifications to show promising performance for analysis of large programs
+comparable to hand-crafted implementations in C++~\cite{scholz_fast_2016}.
+Souffl{\'e} in particular was an inspiration for Polonius, and with the current
+ongoing work on translating Souffl{\'e}-style Datalog into the more cumbersome
+Datafrog EDSL format (discussed in the following section) Polonius can almost be
+said to converge into a specialised ``Souffl{\'e} for Rust''.\footnote{The
+  experimental code to synthesise Datafrog rules can be found on GitHub in the
+  separate repository \url{https://github.com/lqd/datapond}.}
+
+Another inspiration was the \textsc{Doop}
+framework~\cite{smaragdakis_using_2010}, developed by
+\citeauthor*{smaragdakis_using_2010} for a proprietary Datalog engine and later
+ported to Souffl{\'e}~\cite{doop-porting}. \textsc{Doop} specifically performs a
+may-point-to-analysis (much like Polonius), using explicit tuple storage (also
+like Polonius), as opposed to other common representations like Binary Decision
+Diagrams (BDDs). Much like Polonius, the authors of Doop sought a framework that
+would let them specify their analysis clearly in a high-level language. In fact,
+Datalog has been so successful for may-point-to-analysis that a 2016~paper
+developing a lattice-based declarative analysis for the same purpose described
+it as ``the killer application'' of
+Datalog~\cite{Madsen:2016:DFD:2980983.2908096}, a career that took off
+around~\citeyear{Benton:2007:ISD:1273920.1273923} with the work of
+\citeauthor{Benton:2007:ISD:1273920.1273923}, who demonstrated the
+\textsc{Dimple} framework for static analysis of
+Java~\cite{Benton:2007:ISD:1273920.1273923}. This was despite a case study
+showing already in~\citeyear{Dawson:1996:PPA:231379.231399} that logic
+programming (in that case Prolog) would constitute a good trade-off between
+performance of the analysis and efficiency of
+development~\cite{Dawson:1996:PPA:231379.231399}.
+
+However, and as mentioned in Section~\ref{sec:contributions}, Polonius is to our
+knowledge the first attempt at using Datalog for pointer analysis (or any other
+kind of static analysis for that matter) in a production compiler. All the
+previous analyses and frameworks have been predominantly analysis of Java,
+either in the form of source code or byte code, by programs outside of the Java
+compiler.
+
+\section{Embedding Datalog in Rust}\label{sec:datafrog}
+
+Polonius needs to be lean enough to be included in the Rust compiler directly.
+That means that we want to minimise both the extra amount of code produced, and
+the number of dependencies on external packages. Therefore, we have implemented
+Polonius in Datafrog~\cite{datafrog}, a minimalist Datalog embedded in Rust,
+using a worst-case optimal join algorithm described
+in~\cite{ngo_worst-case_2012}.
+
+The fact that Datafrog is embedded in Rust (an EDSL, or Embedded Domain-Specific
+Language) means that standard Rust language abstractions are used to describe
+the computation. Static facts are described as \InRust{Relation}s, while dynamic
+\InRust{Variable}s are used to capture the results of computations, both of
+which are essentially sets of tuples, in our case tuples of integers. Rules are
+described using a join with either a \InRust{Variable} or a \InRust{Relation},
+with an optimised join method used for joins with only one variable, but
+multiple relations. Only single-step joins on the first tuple element are
+possible, which means that more complex rules must be written with intermediary
+variables, and manual indices created whenever a relation must be joined on a
+variable which is not the first in the tuple. An example of the
+\InDatalog{ancestor(Older, Younger)} relation in Datafrog can be seen in
+Listing~\ref{lst:datafrog:ancestor}.
 
 \begin{sourcecode}
   \captionof{listing}[\InDatalog{ancestor(X, Y)} in
@@ -1459,55 +1522,6 @@ tuples matching \InRust{Key} are discarded.
 In Listing~\ref{lst:datafrog:var-live}, we can see a leapjoin populating
 \InRust{var_use_live_var} with tuples produced by joining the \InRust{Relation}s
 representing \InRust{var_defined_rel} and the reversed CFG\@.
-
-\section{Datalog: a Natural Choice for Polonius}\label{sec:why-datalog}
-
-The most obvious reason why we chose Datalog for Polonius lies in the intuition
-developed in Section~\ref{sec:borrow-check-intuition}. If Polonius is a bunch of
-transitive closures computed on certain relations over the CFG, Datalog would be
-a natural fit.
-
-Additionally, Datalog has a long history of use for static analysis, with a
-notable recent example being the Souffl{\'e} system, which synthesises
-performant C++ code from the Datalog specifications to show promising
-performance for analysis of large programs comparable to hand-crafted
-implementations in C++~\cite{scholz_fast_2016}. This approach is similar to how
-Datafrog embeds a minimal solver as a Rust library. Souffl{\'e} in particular
-was an inspiration for Polonius, and with the current ongoing work on
-translating Souffl{\'e}-style Datalog into the more cumbersome Datafrog EDSL
-format Polonius can almost be said to converge into a specialised ``Souffl{\'e}
-for Rust''.\footnote{The experimental code to synthesise Datafrog rules can be
-  found on GitHub in the separate repository
-  \url{https://github.com/lqd/datapond}.}
-
-Another inspiration was the \textsc{Doop}
-framework~\cite{smaragdakis_using_2010}, developed by
-\citeauthor*{smaragdakis_using_2010} for a proprietary Datalog engine and later
-ported to Souffl{\'e}~\cite{doop-porting}. \textsc{Doop} specifically performs a
-may-point-to-analysis (much like Polonius), using explicit tuple storage (also
-like Polonius), as opposed to other common representations like Binary Decision
-Diagrams (BDDs). Much like Polonius, the authors of Doop sought a framework that
-would let them specify their analysis clearly in a high-level language. In fact,
-Datalog has been so successful for may-point-to-analysis that a 2016~paper
-developing a lattice-based declarative analysis for the same purpose described
-it as ``the killer application'' of
-Datalog~\cite{Madsen:2016:DFD:2980983.2908096}, a career that took off
-around~\citeyear{Benton:2007:ISD:1273920.1273923} with the work of
-\citeauthor{Benton:2007:ISD:1273920.1273923}, who demonstrated the
-\textsc{Dimple} framework for static analysis of
-Java~\cite{Benton:2007:ISD:1273920.1273923}. This was despite a case study
-showing already in~\citeyear{Dawson:1996:PPA:231379.231399} that logic
-programming (in that case Prolog) would constitute a good trade-off between
-performance of the analysis and efficiency of
-development~\cite{Dawson:1996:PPA:231379.231399}.
-
-However, and as mentioned in Section~\ref{sec:contributions}, Polonius is to our
-knowledge the first attempt at using Datalog for pointer analysis (or any other
-kind of static analysis for that matter) in a production compiler. All the
-previous analyses and frameworks have been predominantly analysis of Java,
-either in the form of source code or byte code, by programs outside of the Java
-compiler.
-
 
 \chapter{Implementing Polonius}\label{cha:implementation}
 
