@@ -296,7 +296,9 @@ the current borrow checker. This thesis describes a partial implementation of an
 experimental borrow checker called Polonius, which increases the reasoning power
 of the borrow check to the level of individual program statements (a
 flow-sensitive analysis), allowing it to accept previously rejected coding
-patterns like the one in Listing~\ref{lst:motivating-example}.
+patterns like the one in Listing~\ref{lst:motivating-example}. Additionally,
+Polonius has already proven useful for generating inputs to prove the
+correctness of Rust programs~\cite{Astrauskas:2019:LRT:3366395.3360573}.
 
 In practice, Polonius' analysis encompasses a variable liveness analysis
 (Section~\ref{sec:var-livenes}), initialisation tracking
@@ -309,6 +311,7 @@ shared memory.
 
 % say something about Polonius contributions: first EDSL of Datalog in a
 % production language
+
 
 The contributions made in this thesis specifically include the implementation of
 liveness and initialisation calculations (Sections~\ref{sec:liveness}
@@ -669,8 +672,7 @@ the left-hand side's type; \InRust{&'a i32 <: &'b i32}. In practice, this
 establishes that \InRust{'b} lives at most as long as \InRust{'a}, which means
 that the subtyping rules for variables establishes a set membership constraint
 between their provenance variables, as seen in Rule~\ref{eq:s-ref} of
-Section~\ref{sec:type-system}, which gives a brief introduction to the reference
-ownership analysis of Polonius from a type systems perspective.
+Section~\ref{sec:type-system}.
 
 Finally, when talking about the \emph{liveness} of a provenance variable $r$ at
 some point in the control-flow graph $p$, we will mean that $r$ occurs in the
@@ -678,8 +680,7 @@ type of at least one variable which is live at $p$. This has the semantic
 implication that any of the loans in $r$ might be dereferenced at control-flow
 points reachable from $p$, and thus that the terms of the loans in $r$ must be
 respected at that point. The possibility of a future access is not limited to
-direct access of a variable, but also concerns uses in the custom deallocator of
-a \InRust{struct} holding a reference. This scenario is further discussed in
+direct access of a variable and is further discussed in
 Section~\ref{sec:deall-as-spec}.
 
 \section{Polonius as a Type System}\label{sec:type-system}
@@ -723,10 +724,19 @@ not your cup of tea, you may skip the rest of this section.
 Most of the conventions used in the Oxide formulation can be glossed over for
 the purposes of our understanding, but the most important ones are the type
 environment~$\Gamma$, used to map places ($\pi, \pi_1$, and so on) to their
-types ($\tau, \tau_1$, etc). As reference types contain provenance variables
-($\rho$), this type environment is stateful, in that for example typing a
-reference-constructing expression would modify the typing environment to add a
-new loan.
+types ($\tau, \tau_1$, etc). Oxide also needs to distinguish between types of
+statically known size ($\tau^S$) and unknown size ($\tau^U$) As reference types
+contain provenance variables ($\rho$), this type environment is stateful, in
+that for example typing a reference-constructing expression would modify the
+typing environment to add a new loan. Other notation used in the Oxide typing
+judgements discussed here is the one for $\expression{\text{expressions}}$ such
+as $\expression{x = 2}$, and the global ($\Sigma$) and type-variable
+environments ($\Delta$). The two latter will not be of particular interest here,
+but are mentioned because they appear in the rules. Finally, variables that do
+not implement the \InRust{Copy} trait will be denoted with $\text{noncopyable}$.
+This is particularly important for moves, as they typically would not happen if
+the object being moved could instead be cheaply copied to wherever it is being moved.
+
 
 Judgments on the form~$\Gamma \vdash_{\omega} \pi \: : \: \tau$ mean that ``in
 the environment~$\Gamma$, it is safe to use the variable~$\pi$ (of type~$\tau$)
@@ -736,8 +746,6 @@ overlapping~$\pi$, and of $\omega$~is \emph{shared} that there are no
 overlapping loans in the provenance part of $\tau$. The full type system handles
 degradation of these types of references, etc, but would be far beyond the scope
 of our comparison here.
-
-% explain sigma, delta, boxes tau superscript s noncopyable
 
 At the heart of the type system lies the flow-sensitive typing judgments seen in
 Rules~\ref{eq:t-move} and~\ref{eq:t-borrow}, both taken from
