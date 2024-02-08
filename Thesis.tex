@@ -1040,8 +1040,19 @@ error(P) :-
 
 \section{Generating Facts for Polonius in the Rust Compiler}
 
-\fixme{say something about how and when the facts are generated in the Rust
-  compiler.}
+As stated above, the Polonius analysis is performed on the MIR, and the results
+are then mapped back onto the source code when generating user-facing errors.
+While Polonius is a self-contained package with a well-defined interface,
+however, the interface to the code performing the translation of
+compiler-internal data structures into input facts for Polonius has a much
+larger surface area.
+
+Let us return to our example code in Listing~\ref{mir-example-input} and the MIR in
+Figure~\ref{fig:mir-example}. Starting at the first block, \fixme{describe the
+  facts emitted in various places}. \fixme{maybe insert a Polonius fact graph?}.
+
+The general information flow for the fact generation through Rust can be seen in
+Figure~\fixme{a figure}.
 
 \section{A Field Study of Polonius Inputs}\label{sec:field-study-borrow}
 
