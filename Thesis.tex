@@ -243,51 +243,53 @@ reference-analysis part of the borrow check.
   the presence of the one true Word) and disembodied vision. We seek those ruled
 by partial sight and limited voice--not partiality for its own sake but, rather,
 for the sake of the connections and unexpected openings situated knowledges make
-possible. Situated knowledges are about communities, not about isolalted
+possible. Situated knowledges are about communities, not about isolated
 individuals. \textbf{The only way to find a larger vision is to be somewhere in
   particular}}%
 {Donna Haraway, \citetitle{haraway}~(\citeyear{haraway}), emphasis mine}
 
 {\footnotesize
 
-  Being easily confused about the reality of the world, one of my
-  epistemologic touchstones is Donna Haraway's classic notion of
-  \textit{situated knowledges}, as formulated in the quote above and published
-  the year I was born~\cite{haraway}. I do not pretend to understand everything
-  she wrote, but the core idea of situating knowledge within somewhere has
-  always stuck with me.
+  Being easily confused about the reality of the world, one of my epistemologic
+  touchstones is Donna Haraway's classic notion of \textit{situated knowledges},
+  as formulated in the quote above and published the year I was
+  born~\cite{haraway}. I do not pretend to understand everything she wrote, but
+  the core idea of situating knowledge within somewhere has always stuck with
+  me.
 
-It is not by accident I do not work at a software company and hope I never will
-again. I have sampled their ontologies and epistemologies, and they are poison.
-The IT industry as a whole is such an affront to humanity I often think it would
-have been better if we never invented computers at all. I will never produce
-knowledge for the Facebooks, Googles, or Microsofts of the world if I can help
-it. Computers help us produce effect from almost pure thougth. Look at what they
-made of it!
+  It is not by accident I work outside industry hope I never work there again.
+  Their ontologies and epistemologies are poison, and everything they have they
+  extracted from their environment. The IT industry as a whole is such an
+  affront to humanity I often think it would have been better if we never
+  invented computers at all. I will never produce knowledge for the Facebooks,
+  Googles, or Microsofts of the world if I can help it. Computers help us
+  produce effect from almost pure thought. Look at what they made of it! Spam,
+  spam, Canned spam, mind-bending spam, culture-murdering spam.
 
-At the time of writing Rust is very young. Despite this, it still has a
-surprisingly large fan base. The Rust Book notes that ``...the Rust programming
-language is fundamentally about empowerment: no matter what kind of code you are
-writing now, Rust empowers you to reach farther, to program with confidence in a
-wider variety of domains than you did before''~\cite{nichols_rust_nodate}. It
-is around this notion, that systems programming can be \emph{fun}, that we
-\emph{can make new languages}, and so on, that Rust's sometimes eclectic
-community has grown.
+  At the time of writing Rust is very young. Despite this, it still has a
+  surprisingly large and surprisingly nice fan base. The Rust Book notes that
+  ``...the Rust programming language is fundamentally about empowerment: no
+  matter what kind of code you are writing now, Rust empowers you to reach
+  farther, to program with confidence in a wider variety of domains than you did
+  before''~\cite{nichols_rust_nodate}. It is around this notion, that systems
+  programming can be \emph{fun}, that we \emph{can make new languages} for some
+  interesting we, that Rust's often eclectic community has grown.
 
-In no other computer-associated community of late have I found so many
-non-binary trans cyber-witches, hackers, punks, philosophers, and anarchists. At
-times, working on the Rust compiler has felt a lot more like a utopian project
-than it has any right to. Being in this community felt like my early memories of
-the Internet, before it all got first boring (ca 2004--2007), and then dystopian
-(2013--2015 and onwards).
+  In no other contemporary computer-associated community have I found so many
+  non-binary trans cyber-witches, hackers, punks, philosophers, and anarchists.
+  At times, working on the Rust compiler has felt a lot more like a utopian
+  project than it has any right to. Being in this community felt like my early
+  memories of the Internet, before it all got first boring (ca 2004--2007), and
+  then dystopian (2013--2015 and onwards).
 
-It is within this community I want to place my work. Thank you, for reminding me
-that these stupid machines are supposed to be \emph{fun}.
+  It is in this \textit{somewhere} I want to situate my knowledge. It is within
+  this community I want to place my work. Thank you, for reminding me that these
+  stupid machines are supposed to be \emph{fun}.
 
-I would also like to thank specifically and in no particular order the Polonius
-Working Group, including my supervisor, Niko Matsakis, Lqd (pronounced
-``liquid''), and Matthew Jasper, who all answered my dumb questions at one point
-or other.
+  I would also like to thank specifically and in no particular order the
+  Polonius Working Group, including my supervisor, Niko Matsakis, Lqd
+  (pronounced ``liquid''), and Matthew Jasper, who all answered my dumb
+  questions at one point or other.
 
 }
 
@@ -341,7 +343,7 @@ Datalog use in the implementation of a compiler for a practical programming
 language. Systems like Doop~\cite{bravenboer_strictly_2009}, as well as other
 uses of the Souffl{\'e} system~\cite{souffle} have been deployed for practical
 analysis of large Java code bases, but their use has been in separate tools
-rather than in the language implemetations themselves.
+rather than in the language implementations themselves.
 
 The contributions made in this work specifically include the implementation of
 liveness and initialisation calculations (Sections~\ref{sec:liveness}
@@ -428,7 +430,7 @@ Before moving further, we want to point out that Rust represents a different
 trade-off between static reasoning power of the compiler and expressive power
 for the programmer than other popular systems programming languages. By
 disallowing certain patterns of code, such as simultaneously overlapping
-references to writable memory, Rust is able to make greater guarantees of
+references to writeable memory, Rust is able to make greater guarantees of
 safety than, for example, C. This reasoning power comes at the cost of
 restricting certain desirable (and safe) programming patterns that cannot be
 efficiently reasoned about by a compiler. In order to soften the blow from this,
