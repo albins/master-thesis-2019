@@ -1,0 +1,165 @@
+%
+% Template for Doctoral Theses at Uppsala
+% University. The template is based on
+% the layout and typography used for
+% dissertations in the Acta Universitatis
+% Upsaliensis series
+% Ver 5.2 - 2012-08-08
+% Latest version available at:
+%   http://ub.uu.se/thesistemplate
+%
+% Support: Wolmar Nyberg Akerstrom
+% Thesis Production
+% Uppsala University Library
+% avhandling@ub.uu.se
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% \documentclass{UUThesisTemplate}
+\documentclass[11pt,a4paper,twoside,openany]{book}
+
+\author{Albin Stjerna}
+\date{\today}
+
+% Package to determine wether XeTeX is used
+\usepackage{ifxetex}
+
+\ifxetex
+	% XeTeX specific packages and settings
+	% Language, diacritics and hyphenation
+        \usepackage[babelshorthands]{polyglossia}
+        \usepackage{xunicode}
+	\setmainlanguage{english}
+	%\setotherlanguages{swedish}
+
+	% Font settings
+	%\setmainfont{Times New Roman}
+        %\setromanfont{Times New Roman}
+	%\setsansfont{Arial}
+	%\setmonofont{Courier New}
+\else
+	% Plain LaTeX specific packages and settings
+	% Language, diacritics and hyphenation
+    % Use English and Swedish languages.
+	\usepackage[british]{babel}
+
+	% Font settings
+	\usepackage{type1cm}
+	\usepackage[latin1]{inputenc}
+	\usepackage[T1]{fontenc}
+	\usepackage{mathptmx}
+
+	% Enable scaling of images on import
+	\usepackage{graphicx}
+\fi
+
+\usepackage{listings}
+\usepackage{fancyvrb}
+\usepackage{multicol}
+\usepackage[font={small,it}]{caption}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{bm}
+\usepackage{longtable}
+
+\clubpenalty 4000
+\widowpenalty 4000
+
+% Document links and bookmarks
+\usepackage{url}
+\usepackage[xetex, colorlinks=true,
+            linkcolor=blue, citecolor=blue,
+            urlcolor=blue,breaklinks]{hyperref}
+\usepackage[
+    backend=biber,
+    natbib=true,
+    style=ieee,
+    sorting=none,
+    backref=true]{biblatex}
+\bibliography{../bibliography.bib}
+
+% Numbering of headings down to the subsection level
+%\numberingdepth{subsection}
+
+% Including headings down to the subsection level in contents
+%\contentsdepth{subsection}
+
+\setlength{\columnsep}{0.2cm}
+
+\usepackage{csquotes}
+\usepackage{pdfpages}
+\usepackage{amsmath}
+\usepackage{varioref}
+\usepackage{nowidow}
+%\usepackage{cleveref}
+\usepackage[toc,page]{appendix}
+\newcommand{\fixme}[1] {{\color{red}#1}}
+
+\setnowidow[5]
+\setnoclub[3]
+
+% Uncomment to use a custom abstract dummy text
+%\abstractdummy{
+%}
+
+\title{A Dataflow Approach to Reference Ownership Analysis for the Rust Programming Language}
+
+
+\begin{document}
+\frontmatter
+    % Creates the front matter (title page(s), abstract, list of papers)
+    % for either a Comprehensive Summary or a Monograph.
+    % Authors of Comprehensive Summaries use this front matter
+    %\frontmatterCS
+    % Monograph authors use this front matter
+    %\frontmatterMonograph
+
+    % Environment used to create a list of papers
+    % \begin{listofpapers}
+    % 	\item A Paper Discussed in this Thesis \label{apaperlabel}
+    % \end{listofpapers}
+
+\maketitle
+
+    \chapter*{Abstract}
+    \textit{\fixme{This thesis is about something.}}
+
+
+    \begingroup
+        % To adjust the indentation in your table of contents, uncomment and enter the widest numbers for each level
+        %  E.g.  \settocnumwidth{widest chapter number}{widest section number}{widest subsection number}...{...}
+       %  \settocnumwidth{5}{4}{5}{3}{3}{3}
+    \tableofcontents
+    \listoffigures
+    \listoftables
+    \endgroup
+
+    % Optional tables
+    %\listoftables
+    %\listoffigures
+
+    \chapter{Acknowledgements}
+    \fixme{I thank everyone for everything.}
+
+    \part{Introduction}
+    \mainmatter{}
+    \chapter{Background}
+    \chapter{Research questions}
+    \chapter{Method}
+    \chapter{Related Work}
+
+\part{Investigation}
+
+\chapter{Results and Experiments}
+
+\part{Conclusions and Future Work}
+
+%\begin{appendices}
+%\end{appendices}
+
+\backmatter
+\printbibliography[heading=bibintoc]
+\end{document}

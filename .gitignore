@@ -1,0 +1,14 @@
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fls
+*.lof
+/Thesis.log
+*.out
+*.fdb_latexmk
+*.lot
+*.run.xml
+*.toc
+/.DS_Store
+/auto
