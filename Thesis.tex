@@ -116,6 +116,7 @@
 
 \newcommand{\InRust}[1]{\mintinline{rust}{#1}}
 \newcommand{\InDatalog}[1]{\mintinline{prolog}{#1}}
+\newcommand{\expression}[1]{\boxed{#1}}
 
 \newcommand{\RustBlock}[3]{
   \begin{sourcecode}
@@ -422,10 +423,35 @@ section.
 
 Summing up the ongoing work of \citeauthor{weiss_oxide:_2019} on formalising the
 reference ownership rules of Rust~\cite{weiss_oxide:_2019}. At the heart of the
-type system lies the flow-sensitive typing judgement seen in Rule~\fixme{add fig
-  1 of Oxide here.}. \fixme{explain the rules here}.
+type system lies the flow-sensitive typing judgments seen in
+Rules~\ref{eq:t-move} and~\ref{eq:t-borrow}, both of
+\citeauthor{weiss_oxide:_2019}'s paper (Figure~1), with slight modifications.
 
-\fixme{describe the different $\omega$-derivations.}
+The first rule (\ref{eq:t-move}) shows that for a given environment~$\Gamma$, a
+move of a given variable~$\pi$ (occurring if $\pi$ cannot be copied) is only
+valid if~$\pi$ is the only name for that value and removes that value from the
+environment, effectively deallocating it.
+
+\begin{equation}\label{eq:t-move}
+    \ntyperule{\Gamma \vdash_{\text{mut}} \pi : \tau^s \:\: \text{noncopyable } \tau^s}{\Sigma ; \Delta ; \Gamma \vdash \expression{\pi} : \tau^s \implies \Gamma - \pi}
+  \end{equation}
+
+  The second rule, Rule~\ref{eq:t-borrow}, tells that we may create an
+  $\omega$-reference to any variable where $\omega$-use is safe (either sharedly
+  or uniquely), and produce a reference to that variable of the type ``reference
+  to a value of $\pi$'s type,~$\tau$, with its provenance variable being the set
+  containing only that loan, denoted $^{\omega}\pi$''.
+
+\begin{equation}\label{eq:t-borrow}
+  \ntyperule{\Gamma \vdash_{\omega} \pi : \tau}{\Sigma ; \Delta ; \Gamma \vdash \expression{\&\omega \pi} : \left \{ ^{\omega}\pi\right \} \omega \tau \implies \Gamma}
+\end{equation}
+
+Both of these rules constitute ``base cases'' for the ownership system, showing
+how variables get removed from the environment, and how provenance variables in
+reference types are created. In order to describe the full analysis, we need to
+also consider how these relations extend across program execution through
+sequencing or branching. Finally, we will also study how provenance variables
+come into relation with each other through type unification and assignments.
 
 \fixme{describe the branching rules}
 
@@ -746,14 +772,14 @@ number of stars on GitHub, for analysis.~\footnote{Source code for the analysis
 selected repositories only about 1 000 were from other sources than GitHub. Only
 crates that compiled under recent versions of Rust nightly builds with
 non-linear lifetimes enabled were kept. The source code of the packages was then
-translated to Polonius input files for a total of \fixme{186GB}~of tab-separated
+translated to Polonius input files for a total of 283GBs~of tab-separated
 tuples, which I used to measure Polonius solve-time performance as well as for
 finding common patterns in the input data. Only complete data sets were
 considered; a repository with more than one target where at least one target did
-not compile was discarded, as was any repository with more than 4GB~of input
-data for any relation, or where fact generation took longer than 15~minutes due
-to RAM- and time constraints. After this selection process, \fixme{10 000}
-repositories remained for the final study.
+not compile was discarded, as was any repository where the analysis took more
+than 30~minutes, required more memory than what was available, or where fact
+generation took longer than 15~minutes. After this selection process, \fixme{10
+  000} repositories remained for the final study.
 
 It is worth pointing out that Polonius' analysis as part of the Rust compiler
 will be performed on non-compiling Rust code as well, and that the requirement
