@@ -193,13 +193,13 @@ without introducing garbage collection. In particular, it guarantees that
 well-typed programs are free from data-races caused by memory-aliasing,
 use-after-frees, and accesses to deinitialised or uninitialised memory. At the
 heart of Rust's memory safety guarantees lies a system of memory ownership,
-verified statically in the compiler by a process called the borrow check.
-However, the current implementation of the borrow check is not expressive enough
-to prove that several desirable programs indeed does not violate the Rust memory
-ownership rules. This report introduces an improved borrow check called Polonius,
-which increases the resolution of the analysis to reason at the program
-statement level, and enables a more expressive formulation of the borrow check
-itself through the use of a domain-specific language, Datalog.
+verified statically in the compiler by a process called the \textit{borrow
+  check}. However, the current implementation of the borrow check is not
+expressive enough to prove that several desirable programs indeed do not violate
+the Rust memory ownership rules. This report introduces an improved borrow check
+called Polonius, which increases the resolution of the analysis to reason at the
+program statement level, and enables a more expressive formulation of the borrow
+check itself through the use of a domain-specific language, Datalog.
 
 Specifically, this thesis extends Polonius with initialisation and liveness
 computations for variables. Finally, it describes an exploratory study of input
@@ -246,9 +246,9 @@ Section~\ref{sec:borrowing-rules}, and related to the experimental formal type
 system Oxide in Section~\ref{sec:type-system}.
 
 However, these rules represent a trade-off between static provability and
-expressive power. There exist several desirable Rust patterns, suh as the
+expressive power. There exist several desirable Rust patterns, such as the
 example in Listing~\ref{lst:motivating-example}, that cannot be proven safe by
-the current borrow checker. This report describes a partial implementation of an
+the current borrow checker. This thesis describes a partial implementation of an
 experimental borrow checker called Polonius, which increases the reasoning power
 of the borrow check to the level of individual program statements (a
 flow-sensitive analysis), allowing it to accept previously rejected coding
@@ -263,10 +263,13 @@ shared memory.
 
 \section{Contributions}
 
+% say something about Polonius contributions: first EDSL of Datalog in a
+% production language
+
 The contributions made in this thesis specifically include the implementation of
 liveness and initialisation calculations (Sections~\ref{sec:liveness}
 and~\ref{sec:move-analysis} respectively) in Polonius, previously computed in an
-earlier compiler pass. Additionally, this report analyses real-world Rust code
+earlier compiler pass. Additionally, this thesis analyses real-world Rust code
 in ca 12~000 popular publicly available Git repositories found on Crates.io and
 GitHub (Chapter~\ref{sec:field-study-borrow}). It compares two optimised
 variants of Polonius to a baseline naive implementation, and produces statistics
@@ -353,7 +356,7 @@ enforced by the borrow checker are discussed in the next chapter
 (Chapter~\ref{cha:borrowing-rules}).
 
 Due to limitations in its formulation, the current borrow checker rejects code
-such as the one in Listing~\ref{lst:issue-51132}, as it is unable to prove that
+such as the one in Listing~\ref{lst:motivating-example}, as it is unable to prove that
 there are no two overlapping write references to the same location in memory
 (namely \InRust{buffer}). This limitation stems from a more constrained
 reasoning around program flow, which introduces imprecision into the analysis.
@@ -366,7 +369,7 @@ each individual program statement.
     Polonius, rejected by the current borrow checker. The code is sound, as the
     loaned \InRust{event} is either returned out of the loop, or overwritten at
     the next iteration. Therefore, there are no overlapping mutable loans of
-    \InRust{buffer}.~\cite{issue-51132}}\label{lst:issue-51132}
+    \InRust{buffer}.~\cite{issue-51132}}\label{lst:motivating-example}
 \begin{minted}{rust}
 fn next<'buf>(buffer: &'buf mut String) -> &'buf str {
     loop {
@@ -389,12 +392,11 @@ borrow check in a domain-specific language.
 
 \chapter{The Borrow Check: Enforcing Rust's Memory Model}\label{cha:borrowing-rules}
 
-% In addition to being context-sensitive, Rust's borrow checker is also
-% flow-sensitive (i.e. performs analysis for each program point), like the system
-% described by \citeauthor*{Hardekopf:2009:SFP:1480881.1480911}, and whose form is
-% very similar to the analysis performed in practice by
-% Polonius~\cite{Hardekopf:2009:SFP:1480881.1480911}.
-
+In this chapter we will delve deeper into what the borrow check actually means.
+The idea is for the reader to develop an intuition for what it means in practice
+before moving on to the more technical sections. We will also briefly explain
+how the formulation of the borrow check changes between the current
+implementation (non-linear lifetimes, or NLL) and Polonius.
 
 Conceptually, the borrow check verifies that Rust's ownership rules of shared
 memory are respected. Memory is owned by the scope (typically a function, block,
@@ -408,7 +410,7 @@ access. It also verifies that accesses to shared memory through loans respect
 the terms of that loan. A shared reference cannot be mutated, and must be
 guaranteed to be free from use-after-frees.
 
-A sumary of the rules enforced by the borrow check can be found in
+A summary of the rules enforced by the borrow check can be found in
 Table~\ref{tab:borrow-check}. Many of these examples are taken directly or
 slightly modified from \citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 
@@ -542,18 +544,40 @@ let z = |\colorbox{red}{x.0}|;
   \end{minipage}
 \end{tabular}
 \caption[The Rules of the Borrow Check]{The Rules of the borrow check, with
-  positive (free from errors) and negative (with errors) examples.
-  Highlighted code shows sub-expressions that would perform the borrow check,
-  such as mutating, moving, or reading a variable. Green highlights show
-  accepted uses and red ones show failed ones.}
+  positive (free from errors) and negative (with errors) examples. Highlighted
+  code shows (parts of) expressions that would perform the borrow check, such as
+  mutating, moving, or reading a variable. Green highlights show accepted uses
+  and red ones show failed ones.}
   \label{tab:borrow-check}
 \end{table}%
 }
 
 % Actually go through the rules top-to-bottom
 
-\section{From Lifetimes to Provenance Variables}
-\label{sec:reference-provenance}
+
+
+\fixme{Please tell me I am right here!} This memory ownership model and its
+associated type system comes from a long line of reserch into what is known as
+\textit{linear}, or sometimes \textit{affine} types~\cite{wadler1990linear}. A
+linear or affine type captures the concept that a given data structure is
+accessed precisely or at most once, respectively. In this sense, mutable memory
+is linear in Rust. In comparison with other languages like
+Pony~\cite{clebsch2015pony, Clebsch:2015:DCS:2824815.2824816} or
+Encore~\cite{castegren2018capability}, Rust's memory ownership is relatively
+unsophisticated. However, a full review of similar type systems is outside the
+scope of this thesis.
+
+\section{Polonius: From Lifetimes to Provenance Variables}\label{sec:reference-provenance}
+
+% present lifetimes as well
+% this is where we cast borrow check into Polonius
+
+% In addition to being context-sensitive, Rust's borrow checker is also
+% flow-sensitive (i.e. performs analysis for each program point), like the system
+% described by \citeauthor*{Hardekopf:2009:SFP:1480881.1480911}, and whose form is
+% very similar to the analysis performed in practice by
+% Polonius~\cite{Hardekopf:2009:SFP:1480881.1480911}.
+
 
 As the lifetime of its value is a part of a reference variable's type, it can be
 referred to by name using the syntax \InRust{&'lifetime}. In the literature, the
@@ -614,27 +638,51 @@ direct access of a variable, but also concerns uses in the custom deallocator of
 a \InRust{struct} holding a reference. This scenario is further discussed in
 Section~\ref{sec:deall-as-spec}.
 
-\section{The Borrow Check as a Type System}\label{sec:type-system}
+\section{Polonius as a Type System}\label{sec:type-system}
 
 In this section, we will relate Polonius to \citeauthor*{weiss_oxide:_2019}
 ongoing work of \citeauthor*{weiss_oxide:_2019} on formalising the reference
 ownership rules of Rust into the formally defined type system
-Oxide~\cite{weiss_oxide:_2019}. Oxide is notable in that it shares Polonius'
-view of variables as sets of possible points in the code that would give rise to
-the reference (``loans'' of the variable). The rules presented here are based on
-the 2019 draft version of the paper, and will change substantially in the
-paper's final version.
+Oxide~\cite{weiss_oxide:_2019}. Oxide is notable in that it shares Polonius' use
+of provenance variables, as introduced in
+Section~\ref{sec:reference-provenance}, in contrast to NLL. The rules presented
+here are based on the 2019 draft version of the paper and will change
+substantially for its final version.
 
 The typing rules of this section are meant to be read top-to-bottom. They mean
 that as long as the conditions above the horizontal bar holds, the conclusion
 below it will hold; usually that an expression is sound with respect to the type
-system (it type-checks). Most of the conventions used in the Oxide formulation
-can be glossed over for our purposes here, but the most important ones are the
-type environment~$\Gamma$, used to map places (roughly: variables) ($\pi,
-\pi_1$, and so on) to their types ($\tau, \tau_1$, etc). As reference types
-contain provenance variables ($\rho$), this type environment is stateful, in
-that for example typing a reference-constructing expression would modify the
-typing environment to add a new loan.
+system (it type-checks).
+
+Before going into the complexities of Oxide, we will start with a simplified
+typing judgement in Rule~\eqref{eq:s-ref-baby}, which says that a reference type
+is a subtype of another reference type iff their provenance variables are a
+subset. These typing judgements are implied on assignments with the intuition
+that you can only assign a right-hand side to a left-hand-side if the
+right-hand-side can function as a (is a subtype of) the left-hand-side. Such
+judgements will in practice be the main source of constraints on provenance
+variables in Polonius (the \InDatalog{outlives} fact described in
+Chapter~\ref{cha:borrow-check-compiler}). In other words, if type systems are
+not your cup of tea, you may skip the rest of this section.
+
+\begin{equation}\label{eq:s-ref-baby}
+  \ntyperule{
+    \rho_1 \subseteq \rho_2 \:\:\:\:\:\:\:\:
+    \tau_1 <: \tau_2
+  }%--------
+  {
+    \&\rho_1 \tau_1 <: \&\rho_2 \tau_2
+  }
+\end{equation}
+
+
+Most of the conventions used in the Oxide formulation can be glossed over for
+the purposes of our understanding, but the most important ones are the type
+environment~$\Gamma$, used to map places ($\pi, \pi_1$, and so on) to their
+types ($\tau, \tau_1$, etc). As reference types contain provenance variables
+($\rho$), this type environment is stateful, in that for example typing a
+reference-constructing expression would modify the typing environment to add a
+new loan.
 
 Judgments on the form~$\Gamma \vdash_{\omega} \pi \: : \: \tau$ mean that ``in
 the environment~$\Gamma$, it is safe to use the variable~$\pi$ (of type~$\tau$)
@@ -814,27 +862,7 @@ fact, which is the major source of constraints on loans.
   }
 \end{equation}
 
-However, since we are working on just a part of the type validation of Rust, we
-can simplify this complex subtyping rule for our purposes into
-Rule~\eqref{eq:s-ref-baby}, which says that a reference type is a subtype of
-another reference type iff their provenance variables are a subset.
-
-\begin{equation}\label{eq:s-ref-baby}
-  \ntyperule{
-    \rho_1 \subseteq \rho_2 \:\:\:\:\:\:\:\:
-    \tau_1 <: \tau_2
-  }%--------
-  {
-    \&\rho_1 \tau_1 <: \&\rho_2 \tau_2
-  }
-\end{equation}
-
-We now imagine this typing rule yielding these subtyping constraints for every
-assignment in the MIR we are verifying. Polonius only concerns itself with the
-attached provenance variables of the types, other parts of the compiler verifies
-the rest of the typing judgment. Equipped with this simpler rule, we now have
-enough understanding of the formal basis of Polonius to move forward with the
-actual implementation.
+\section{Intuition: Polonius is Just a Bunch of Transitive Closures}\label{sec:borrow-check-intuition}
 
 
 \begin{figure}[h!]
@@ -848,7 +876,12 @@ actual implementation.
   \label{fig:polonius-high-level-overview}
 \end{figure}
 
-
+We now imagine this typing rule yielding these subtyping constraints for every
+assignment in the MIR we are verifying. Polonius only concerns itself with the
+attached provenance variables of the types, other parts of the compiler verifies
+the rest of the typing judgment. Equipped with this simpler rule, we now have
+enough understanding of the formal basis of Polonius to move forward with the
+actual implementation.
 \chapter{The Borrow Check in the Rust Compiler}\label{cha:borrow-check-compiler}
 
 \begin{figure}[h!]
