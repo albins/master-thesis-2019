@@ -741,22 +741,52 @@ region_live_at(R, P) :-
 I selected roughly 20 000~publicly available Rust packages (``crates'') from the
 most popular projects, as defined by number of downloads from Crates.io and
 number of stars on GitHub, for analysis.~\footnote{Source code for the analysis
-  as well as listings of the repositories are available \fixme{on the moon}.} Of
-the initially selected repositories only about 1 000 were from other sources
-than GitHub. Only crates that compiled under recent versions of Rust nightly
-builds with non-linear lifetimes enabled were kept. The source code of the
-packages was then translated to Polonius input files for a total of
-\fixme{186GB}~of tab-separated tuples, which I used to measure Polonius
-solve-time performance as well as for finding common patterns in the input data.
-Only complete data sets were considered; a repository with more than one target
-where at least one target did not compile was discarded, as was any repository
-with more than 8GB~of input data for any relation, or where fact generation took
-longer than 15~minutes due to RAM- and time constraints. After this selection
-process, \fixme{10 000} repositories remained for the final study.
+  as well as listings of the repositories are available at
+  \url{https://github.com/albins/msc-polonius-fact-study}.} Of the initially
+selected repositories only about 1 000 were from other sources than GitHub. Only
+crates that compiled under recent versions of Rust nightly builds with
+non-linear lifetimes enabled were kept. The source code of the packages was then
+translated to Polonius input files for a total of \fixme{186GB}~of tab-separated
+tuples, which I used to measure Polonius solve-time performance as well as for
+finding common patterns in the input data. Only complete data sets were
+considered; a repository with more than one target where at least one target did
+not compile was discarded, as was any repository with more than 4GB~of input
+data for any relation, or where fact generation took longer than 15~minutes due
+to RAM- and time constraints. After this selection process, \fixme{10 000}
+repositories remained for the final study.
 
-% what do we want to know?
-% what are our proxy variables?
-% on what type of machine was the analysis performed?
+It is worth pointing out that Polonius' analysis as part of the Rust compiler
+will be performed on non-compiling Rust code as well, and that the requirement
+that all crates must compile is an entirely artificial one and might exclude
+interesting input cases. However, it is non-trivial to separate build failures
+due to syntax errors or missing dependencies from build failures at later stages
+of the build process that would involve Polonius. Therefore all non-compiling
+crates were excluded from the study.
+
+The main metric of ``performance'' in this study is the time it would take
+Polonius to solve a given set of inputs. In this case, this also includes the
+time it takes to parse and intern the files of tab-separated input tuples to
+Polonius, which is assumed to be negligible compared to the runtime of the
+analysis itself, which includes both a liveness analysis and the borrow check
+itself. In practical scenarios the peak memory usage of the analysis would also
+be an interesting metric.
+
+When studying inputs to Polonius, I am mainly interested in two properties; how
+large and how complex the function under analysis is. Neither of these can be
+measured directly, but useful proxy variables would be sizes of input tuples,
+the number of variables, loans, and regions, as well as common and cheaply
+computed graph complexity metrics such as the node count, density, transitivity,
+and number of connected components of the control-flow graph.
+
+% are inputs very different?
+
+% how common are drops
+
+% normalising the results
+
+% nice graphs
+
+% discuss the results and what that means for Polonius
 
 \section{Optimising the Borrow Checker}\label{sec:optim-borr-check}
 
