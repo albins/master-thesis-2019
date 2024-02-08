@@ -879,16 +879,72 @@ The following short-hand names are used:
 \item[\InDatalog{var_drops_region(V, R)}] when the type of~$V$ includes the
   provenance~$R$, and~$V$ also implements a custom drop method which might need
   all of~$V$'s data, as discussed in Section~\ref{sec:deall-as-spec}.
+
+\item[\InDatalog{child(M1, M2)}] when the move path $M_1$ is the child of $M_2$,
+  That is, for example in the expression \InRust{x.y.z}, \InRust{x.y.z} is a
+  child of \InRust{x.y} and \InRust{x}. \fixme{Is this direct parenthood or
+    transitive?}
+
+\item[\InDatalog{path_belongs_to_var(M, V)}] for every move path $M$ that starts
+  in variable $V$. \fixme{verify that this doesn't just return the root path
+    into $V$, and if so; clarify and propagate to facts.rs!}
+
+\item[\InDatalog{initialized_at(M, P)}] when the move path $M$ was initialized
+  at point $P$, such as for example in the expression \InRust{x.y = 17}, which would
+  initialise the path \InRust{x.y}. \fixme{Verify what happens when we
+    initialise the only child of a path; does that path also become initialised?}
+
+\item[\InDatalog{moved_out_at(M, P)}] when the move path $M$ was moved out
+  (deinitialised) at point $P$.
+
+\item[\InDatalog{path_accessed_at(M, P)}] when the move path $M$ was accessed at
+  point $P$. This fact is not used in any of the current calculations, but is
+  the final component needed to calculate erroneous accesses of (potentially)
+  moved paths.  
 \end{description}
-
-
-\fixme{Update this list for initialisation tracking!}
 
 \subsection{Variable Initialisation}
 \label{sec:var-initalisation}
 
-\subsubsection{Reporting Initialisation Errors}
-\label{sec:initialisation:errors}
+The idea behind variable initialisation calculations is fairly straightforward.
+Initialisation for a leaf path propagates exactly like use-liveness, except
+forwards across the CFG. The path-specific difference is that initialisation
+also travels upwards through the path tree, such that \InRust{x} is (partially)
+initialised whenever \InRust{x.y} is. An expression like \InRust{move x} would,
+in this example, \emph{both} emit \InDatalog{moved_out_at(x, p)} \emph{and}
+\InDatalog{moved_out_at(x.y, p)}. \fixme{verify that this is correct!}
+
+Finally, paths are traced back to their root variables across the
+\InDatalog{path_belongs_to_var(P, V)} fact. It is worth noting here that this
+fact only needs to contain a mapping of the root path to a variable, as
+initialisation always bubbles up through the tree, eventually reaching the root
+path. The full Datalog code is shown in Listing~\ref{lst:var-initialised}.
+
+\begin{sourcecode}
+  \captionof{listing}{The rules for computing possible partial variable
+    initialisation. A path is trivially initialised where it is actually
+    initialised. It is transitively initialised in all points reachable from a
+    point where it is initialised, and where it has not been deinitialised
+    (moved out). Initialisation propagates upwards in the move path tree, until
+    it reaches the variable at the root of the path.}\label{lst:var-initialised}
+\begin{minted}{prolog}
+path_maybe_initialized_on_exit(Path, Point) :- 
+    initialized_at(Path, Point).
+
+path_maybe_initialized_on_exit(M, Q) :-
+    path_maybe_initialized_on_exit(M, P),
+    cfg_edge(P, Q),
+    !moved_out_at(M, Q).
+
+path_maybe_initialized_on_exit(Mother, P) :-
+    path_maybe_initialized_on_exit(Daughter, P),
+    child(Daughter, Mother).
+
+var_maybe_initialized_on_exit(V, P) :-
+    path_belongs_to_var(M, V),
+    path_maybe_initialized_at(M, P).
+\end{minted}
+\end{sourcecode}
 
 \subsection{Reference Liveness}
 \label{sec:var-livenes}
@@ -899,9 +955,13 @@ $p$ in the control-flow graph, then~$v$ is live in~$p$ too unless it was
 overwritten; in essence liveness is propagated backwards through the CFG.
 
 \begin{sourcecode}
-  \captionof{listing}{The Datalog rules for variable
-    use-liveness.}\label{lst:var-live}
+  \captionof{listing}{The rules for calculating use-liveness: a variable is
+    use-live if it was used at a point $P$, or if it was live in $Q$, there is a
+    transition $P\rightarrow{}Q$, and it was not defined (killed) in
+    $P$.}\label{lst:var-live}
 \begin{minted}{prolog}
+var_live(V, P) :- var_used(V, P).
+
 var_live(V, P) :-
     var_live(V, Q),
     cfg_edge(P, Q),
@@ -909,11 +969,39 @@ var_live(V, P) :-
 \end{minted}
 \end{sourcecode}
 
-\fixme{describe drop-liveness}
+\begin{sourcecode}
+  \captionof{listing}{The rules for calculating drop-liveness: the rules are
+    similar to those for to use-liveness (Listing~\ref{lst:var-live}), but
+    propagation of liveness only happens if the variable being dropped may be
+    initialised. Note that the rule for calculating initialisation on entry is
+    not transitive!}\label{lst:use-live}
+\begin{minted}{prolog}
+var_maybe_initialized_on_entry(V, Q) :-
+    var_maybe_initialized_on_exit(V, P),
+    cfg_edge(P, Q).
 
-There is also a very similar relation for drop-liveness with an identical shape
-and different input relations corresponding to drop-uses. An example of the
-output from this calculation can be seen in Figure~\ref{fig:liveness-graph}.
+var_drop_live(V, P) :-
+    var_drop_used(V, P),
+    var_maybe_initialzed_on_entry(V, P).
+
+var_drop_live(V, P) :-
+    var_drop_live(V, Q),
+    cfg_edge(P, Q),
+    !var_defined(V, P)
+    var_maybe_initialized_on_exit(V, P).
+\end{minted}
+\end{sourcecode}
+
+Drop-liveness is calculated in a similar fashion to use-liveness, with the
+exception that a deinitialised variable is never dropped, and therefore is not
+considered drop-live. The rules can be found in Listing~\ref{lst:use-live}. Note
+the use of the first rule, which is not transitive, to shift the point of the
+relation from the input's mid-point index (which is where a (de)initialisation
+would take effect) to the statement's starting-point. The reason for this
+transformation is mainly technical.
+
+An example of the output from this calculation can be seen in
+Figure~\ref{fig:liveness-graph}.
 
 Both of these are then used to calculate the reference liveness relation
 (Listing~\ref{lst:region-live-at}), which serves as input for the rest of the
@@ -1080,13 +1168,13 @@ error(P) :-
 \end{minted}
 \end{sourcecode}
 
-\subsection{What is Missing from Polonius?}\label{sec:missing-features}
+\section{What is Missing from Polonius?}\label{sec:missing-features}
 
 In addition to polish, comprehensive benchmarking, and performance
 optimisations, there are three important features missing in Polonius before it
 reaches parity with NLL, the current borrow checker.
 
-\subsubsection{Detecting Accesses to Paths that Could Have Been Moved Out}
+\subsection{Detecting Access to Deinitialised Paths}
 \label{sec:missing-features:move}
 
 The current Polonius implementation only uses move data to calculate variables
@@ -1105,7 +1193,7 @@ implementation and testing of the logic depends on a re-designed interface to
 Polonius that would allow it to report errors of different kinds, and was not
 performed as part of the work for this thesis.
 
-\subsubsection{Illegal Subset Relations}
+\subsection{Illegal Subset Relations}
 \label{sec:missing-features:illegal-subset-relations}
 
 Polonius currently does not verify that the subset relationships it finds between
@@ -1128,7 +1216,7 @@ polymorphic over these provenance variables, this must hold for \emph{any} pair
 of provenance variables \InRust{'x, 'y}, which it does
 not~\cite{matsakis_polonius_2019-1}.
 
-\subsubsection{Analysis of Higher Kinds}
+\subsection{Analysis of Higher Kinds}
 \label{sec:missing-features:higher-kinds}
 
 The final missing functionality in Polonius is interaction with higher-ranked
@@ -1138,7 +1226,7 @@ described in a blog entry by
 require extensions in the Rust compiler, which would produce simpler constraints
 for Polonius to solve.
 
-\subsubsection{Provenance Variable Equality Imprecision}
+\subsection{Addressing Provenance Variable Imprecision}
 \label{sec:missing-features:provenance-variable-equality}
 
 During the work for this thesis, a shortcoming in both Polonius and (probably)
@@ -1224,9 +1312,15 @@ the ones needing the transient output by the type checker (i.e provenance
 variables and their relations to each other and to variables) under the
 \texttt{type\_check} submodule.
 
-Returning to the examples of the borrowing rules in
-Section~\ref{sec:borrowing-rules}, we can describe the (new) facts that would be
-output on each line:
+Returning to one of the examples of the borrowing rules in
+Section~\ref{sec:borrowing-rules}, we can describe some of the facts that would
+be output on each line. An annotated example can be seen in
+Listing~\ref{lst:polonius-fact-emission}.
+
+\begin{sourcecode}
+  \captionof{listing}{A minimal example of a violated loan in Rust and the
+    Polonius input facts it would produce during
+    compilation.}\label{lst:polonius-fact-emission}
 \begin{minted}{rust}
     let mut pt = Point(6, 9); // var_defined(pt)
     let x = &mut pt;  // var_defined(x),
@@ -1239,6 +1333,7 @@ output on each line:
 
    // we assume var_used(x), var_used(y) is emitted here.
 \end{minted}
+\end{sourcecode}
 
 Of course, this would happen at the MIR level, which would introduce
 intermediary variables. However, the core reasoning is the same: the right-hand
