@@ -2077,24 +2077,26 @@ path_maybe_moved_on_exit(Path, Point2) :-
   \label{tab:polonius-facts-recap}
 \end{table}%
 
-%% FIXME:
-%%% a loan being killed
-%%% a loan being violated after it dies
-%%% a live loan being violated
-%%% multiple subsets being assigned
 { \renewcommand{\arraystretch}{1.0}
   \begin{table}[!htbp]    
 \begin{tabular}{@{}l l l l l}
-  Statement & Killed & Invalidates & Set memberships & Live provenances \\ \hline
-  \InRust{let x = (2, 3);} \\
-  \InRust{move x.0}  \\ % a move
-  \InRust{x.1.0 + 7}  \\ % a legal access to partially deinitialised
-  \InRust{x.0 + 3}  \\ % illegal access to partially deinitialised
-  \InRust{x.0 = 4}  \\ % re-initialisation
-  \InRust{let z = (1, (2, 3));}  \\ % nested paths
-  \InRust{if random() {move x.0}}  \\ % imprecision
+  Statement & Killed & Invalidates & New Constraints & Live provenances \\ \hline
+  \InRust{let p: &'p i32 = &'1 x} & & &  \InRust{'1} $\subseteq$ \InRust{'p}, \InRust{&'1 x} $\in$ \InRust{'1} &  \\
+  \InRust{let q: &'q i32 = &'2 x} & & & \InRust{'2} $\subseteq$ \InRust{'q}, \InRust{&'2 x} $\in$ \InRust{'2} & \InRust{'p} \\
+  \InRust{let r: &'r i32} & & &  & \InRust{'p} \\
+  \InRust{q = &'3 y} & \InRust{&'2 x} & & \InRust{'3} $\subseteq$ \InRust{'q}, \InRust{&'3 x} $\in$ \InRust{'3} & \InRust{'p, 'q, 'r} \\
+  \InRust{r=if f(){&'4 x}else{&'5 y}} & & & \InRust{'4},  \InRust{'5} $\subseteq$ \InRust{'q}, \InRust{&'4 x} $\in ...$ & \InRust{'p, 'q, 'r} \\
+  \InRust{x += 1} & & \InRust{&'1 x}, ... , \InRust{&'4 x} && \InRust{'p, 'q, 'r} \\
+  \InRust{use(p, q, r)} & & & & \InRust{'p, 'q, 'r} \\
 \end{tabular}
-\caption[Loan Constraint Propagation Example]{\fixme{Loan Constraint Propagation Example}}
+\caption[Loan Constraint Propagation Example]{An example of the set membership
+  constraints seen by Polonius during type-checking. Only two of the three
+  invalidated loans would result in an error, as one of them has been
+  \texttt{killed} by an assignment. Therefore, when \InRust{x} is assigned at
+  the fourth statement, the set memberships would be \InRust{'p} $=
+  \Set{\text{\InRust{&'1 x}}}$, \InRust{'q} $= \Set{\text{\InRust{&'3 y}}}$,
+  \InRust{'r} $= \Set{\text{\InRust{&'4 x}, \InRust{&'5 y}}}$,
+  resulting in only one two errors.}
   \label{tab:borrowck-example}
 \end{table}%
  }
