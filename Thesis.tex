@@ -1337,20 +1337,20 @@ ancestor(Grandmother, Daughter) :-
 \end{minted}
 
 Datafrog~\cite{datafrog} is a minimalist Datalog implementation embedded in
-Rust, providing an implementation of a worst-case optimal join algorithm as
-described in~\cite{ngo_worst-case_2012}. The fact that Datafrog is embedded in
-Rust (an EDSL) means that standard Rust language abstractions are used to
-describe the computation. Static facts are described as \InRust{Relation}s,
-while dynamic \InRust{Variable}s are used to capture the results of
-computations, both of which are essentially sets of tuples, in our case tuples
-of integers. Rules are described using a join with either a \InRust{Variable} or
-a \InRust{Relation}, with an optimised join method used for joins with only one
-variable, but multiple relations. Only single-step joins on the first tuple
-element are possible, which means that more complex rules must be written with
-intermediary variables, and manual indices created whenever a relation must be
-joined on a variable which is not the first in the tuple. An example of the
-\InDatalog{ancestor(Older, Younger)} relation in Datafrog can be seen in
-Listing~\ref{lst:datafrog:ancestor}.
+Rust, using a worst-case optimal join algorithm as described
+in~\cite{ngo_worst-case_2012}. The fact that Datafrog is embedded in Rust (an
+EDSL, or Embedded Domain-Specific Language) means that standard Rust language
+abstractions are used to describe the computation. Static facts are described as
+\InRust{Relation}s, while dynamic \InRust{Variable}s are used to capture the
+results of computations, both of which are essentially sets of tuples, in our
+case tuples of integers. Rules are described using a join with either a
+\InRust{Variable} or a \InRust{Relation}, with an optimised join method used for
+joins with only one variable, but multiple relations. Only single-step joins on
+the first tuple element are possible, which means that more complex rules must
+be written with intermediary variables, and manual indices created whenever a
+relation must be joined on a variable which is not the first in the tuple. An
+example of the \InDatalog{ancestor(Older, Younger)} relation in Datafrog can be
+seen in Listing~\ref{lst:datafrog:ancestor}.
 
 \begin{sourcecode}
   \captionof{listing}[\InDatalog{ancestor(X, Y)} in
