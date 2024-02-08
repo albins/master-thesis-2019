@@ -442,10 +442,13 @@ there is a continuous interest in increasing the reasoning power of the borrow
 check, and thereby the expressive power of Rust as a language. It is within this
 equation that Polonius fits.
 
-\section{Limitations Addressed By Polonius}\label{sec:limitations}
+\section{Polonius: Addressing the Limitations of Rust's Borrow
+  Checker}\label{sec:limitations}
 
-Due to limitations in its formulation, the current borrow checker, \textit{non-linear
-lifetimes} (NLL), rejects code such as the one in
+As explained in the previous section, the basis for Rust's automatic memory
+management is a static analysis tracking the ownership of each potentially
+shared object. Due to limitations in its formulation, the current borrow
+checker, \textit{non-linear lifetimes} (NLL), rejects code such as the one in
 Listing~\ref{lst:motivating-example}, as it is unable to prove that there are no
 two overlapping write references to the same location in memory (namely
 \InRust{buffer}). This limitation stems from a more constrained reasoning around
@@ -454,7 +457,7 @@ the current borrow checker reasons about references and their referents (the
 memory they refer to) in terms of \textit{lifetimes}, interpreted as the lines
 of a program where a reference may be used. Polonius is designed to address this
 imprecision by extending the reasoning power of the borrow check to be
-flow-sensitive, that is reason at the power of each individual program
+flow-sensitive, that is reason at the level of each individual program
 statement. For a slightly longer explanation of the differences between the
 current borrow checker and Polonius, see Section~\ref{sec:reference-provenance}.
 
