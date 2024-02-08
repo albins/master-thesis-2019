@@ -1028,7 +1028,7 @@ closely introduced when they are used. Facts describe relationships between
 used in Polonius can be found in Table~\ref{tab:input-atoms}.
 
 { \renewcommand{\arraystretch}{1.0}
-\begin{table}[h]
+\begin{table}[!htbp]
   \begin{tabular}{@{}l l m{7cm}}
     Atom & Example & Description \\ \hline
     Loan\notmine & \InRust{&x} & An individual borrow expression. \\
@@ -1044,7 +1044,7 @@ used in Polonius can be found in Table~\ref{tab:input-atoms}.
 }
 
 { \renewcommand{\arraystretch}{1.0}
-\begin{table}[h]
+\begin{table}[!htbp]
 \begin{tabular}{@{}l l@{} l@{} @{}l@{}}
   Fact & Code Example & Resulting Tuple(s) & Used \\ \hline
   \InDatalog{borrow_region(R, L, P)}\notmine & \InRust{bb0[0]}: \InRust{_1 = &1;}&
@@ -1455,7 +1455,7 @@ A summary of the facts, intermediate relations, and outputs of Polonius'
 liveness computations can be found in Table~\ref{tab:liveness-facts-recap}.
 
 { \renewcommand{\arraystretch}{1.0}
-\begin{table}[h]
+\begin{table}[!htbp]
   \begin{tabular}{@{}l l m{5.5cm}}
     Atom/Fact & Type & Description \\ \hline
     Provenance\notmine & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
@@ -1662,7 +1662,7 @@ region_live_at(R, P) :-
 \end{sourcecode}
 
 { \renewcommand{\arraystretch}{1.0}
-\begin{table}[h]
+\begin{table}[!htbp]
 \begin{tabular}{@{}l l l l}
   Statement & Use-live & Drop-live & Provenance(s) live \\ \hline
   \InRust{let mut x = 13;} \\
@@ -1681,7 +1681,7 @@ region_live_at(R, P) :-
 \section{Move Analysis}\label{sec:move-analysis}
 
 { \renewcommand{\arraystretch}{1.0}
-\begin{table}[h]
+\begin{table}[!htbp]
   \begin{tabular}{@{}l l m{5.5cm}}
     Atom/Fact & Type & Description \\ \hline
     Provenance\notmine & A & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
@@ -1886,15 +1886,38 @@ path_maybe_moved_on_exit(Path, Point2) :-
 \end{sourcecode}
 
 
+%% FIXME 
+{ \renewcommand{\arraystretch}{1.0}
+  \begin{table}[!htbp]    
+\begin{tabular}{@{}l l l l}
+  Statement & Maybe init & Definitely init & Accessed \\ \hline
+  \InRust{let x = (2, 3);} \\
+  \InRust{move x.0}  \\ % a move
+  \InRust{x.1.0 + 7}  \\ % a legal access to partially deinitialised
+  \InRust{x.0 + 3}  \\ % illegal access to partially deinitialised
+  \InRust{x.0 = 4}  \\ % re-initialisation
+  \InRust{let z = (1, (2, 3));}  \\ % nested paths
+  \InRust{if random() {move x.0}}  \\ % imprecision
+\end{tabular}
+\caption[Move Error Example]{\fixme{An example of the outputs of key relations
+    of the move analysis at the mid-point of each statement. Note that the
+    example is slightly inauthentic; in reality, integers implement the
+    \InRust{Copy} trait, and so would not be moved and some statements have been
+    shortened to just expressions.}}
+  \label{tab:move-example}
+\end{table}%
+ }
+
+
 \section{Loan Constraint Propagation\notmine{}}\label{sec:loan-constr-prop}
 
 { \renewcommand{\arraystretch}{1.0}
-\begin{table}[h]
+\begin{table}[!htbp]
   \begin{tabular}{@{}l l m{5.5cm}}
     Atom/Fact & Type & Description \\ \hline
     Provenance\notmine & Atom & The explicit or inferred part of a reference type that contains the set of loans it could have come from.  \\
     Point\notmine & Atom & A point in the control-flow graph. \\
-    Loan\notmine & Atom & A unique borrow expression. \\
+    Loan\notmine & Atom & A unique borrow expression (\InRust{&x}). \\
     \InDatalog{cfg_edge(P, Q)}\notmine & Fact & A transition in the CFG. \\
     \InDatalog{region_live_at(Provenance, Point)} & Fact & This provenance variable is live at this point, and the conditions of its loan must be accepted. \\
     \InDatalog{borrow_region(Provenance, Loan, Point)}\notmine & Fact & A borrow expression at this point creates this loan and this provenance variable. \\
@@ -1908,6 +1931,28 @@ path_maybe_moved_on_exit(Path, Point2) :-
 \caption{Loan Constraint Propagation Dramatis Personae}
   \label{tab:polonius-facts-recap}
 \end{table}%
+
+%% FIXME:
+%%% a loan being killed
+%%% a loan being violated after it dies
+%%% a live loan being violated
+%%% multiple subsets being assigned
+{ \renewcommand{\arraystretch}{1.0}
+  \begin{table}[!htbp]    
+\begin{tabular}{@{}l l l l l}
+  Statement & Killed & Invalidates & Set memberships & Live provenances \\ \hline
+  \InRust{let x = (2, 3);} \\
+  \InRust{move x.0}  \\ % a move
+  \InRust{x.1.0 + 7}  \\ % a legal access to partially deinitialised
+  \InRust{x.0 + 3}  \\ % illegal access to partially deinitialised
+  \InRust{x.0 = 4}  \\ % re-initialisation
+  \InRust{let z = (1, (2, 3));}  \\ % nested paths
+  \InRust{if random() {move x.0}}  \\ % imprecision
+\end{tabular}
+\caption[Loan Constraint Propagation Example]{\fixme{Loan Constraint Propagation Example}}
+  \label{tab:borrowck-example}
+\end{table}%
+ }
 
 The first relation used in Polonius is the \InDatalog{subset(R1, R2, P)}
 relation, which states that~$R_1 \subseteq R_2$ for two provenance
@@ -1928,14 +1973,38 @@ subset(R1, R2, P) :- outlives(R1, R2, P).
 \end{minted}
 \end{sourcecode}
 
+\begin{figure}
 \begin{sourcecode}
-  \captionof{listing}{Subset relations are transitive.}\label{lst:subset-transitive}
 \begin{minted}{prolog}
 subset(R1, R3, P) :-
     subset(R1, R2, P),
     subset(R2, R3, P).
 \end{minted}
 \end{sourcecode}
+
+{ \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{@{}l l}
+      Positive & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{subset('a, 'b, Mid(bb0[1]))}\\
+                     \InRust{subset('b, 'c, Mid(bb0[1]))}
+                   \end{tabular} &%
+                                   \InRust{subset('a, 'c, Mid(bb0[1]))}
+                 \end{tabular}\\
+      Negative & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{subset('a, 'b, Mid(bb0[1]))}\\
+                     \InRust{subset('a, 'c, Mid(bb0[1]))}
+                   \end{tabular} &%
+                                   (nothing)
+                 \end{tabular}\\
+    \end{tabular}    
+  }
+  \caption{Subset relations are transitive (as you would
+    expect).}\label{fig:subset-transitive}
+\end{figure}
 
 Finally, Polonius needs logic to carry these subset relations across program
 flow. However, as mentioned before, we are only interested in detecting
@@ -1948,9 +2017,8 @@ the subset constraint across a CFG~edge $P \rightarrow Q$ becomes the
 formulation seen in Listing~\ref{lst:subset-propagation}, using the output of
 the liveness calculations described in Section~\ref{sec:var-livenes}.
 
+\begin{figure}
 \begin{sourcecode}
-  \captionof{listing}{Subset relations propagate across CFG~edges iff their
-    provenance variables are live.}\label{lst:subset-propagation}
 \begin{minted}{prolog}
 subset(R1, R2, Q) :-
     subset(R1, R2, P),
@@ -1960,6 +2028,33 @@ subset(R1, R2, Q) :-
 \end{minted}
 \end{sourcecode}
 
+{ \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{@{}l l}
+      Positive & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{subset('a, 'b, Mid(bb0[1]))}\\
+                     \InRust{cfg_edge(Mid(bb0[1]), Start(bb0[2]))}\\
+                     \InRust{region_live_at('a, Start(bb0[2]))}\\
+                     \InRust{region_live_at('b, Start(bb0[2]))}\\
+                   \end{tabular} &%
+                                   \InRust{subset('a, 'b, Start(bb0[2]))}
+                 \end{tabular}\\
+      Negative & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{subset('a, 'b, Mid(bb0[1]))}\\
+                     \InRust{cfg_edge(Mid(bb0[1]), Start(bb0[2]))}\\
+                     \InRust{region_live_at('a, Start(bb0[2]))}\\
+                   \end{tabular} &%
+                                   (nothing)
+                 \end{tabular}\\
+    \end{tabular}    
+  }
+
+  \caption{Subset relations propagate across CFG~edges iff both of their
+    provenance variables are live.}\label{fig:subset-propagation}
+\end{figure}
 These rules describe how provenance variables relate to each other. The other
 part of the logic describes which loans belong to which provenance variable. The
 trivial base case is shown in Listing~\ref{lst:requires-borrow}, which just says
