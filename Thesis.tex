@@ -225,7 +225,7 @@ language Oxide, described by
 
 % describe what others have done
 % describe what was already there
-
+% describe rvalues???
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
 
 % FIXME: show where in the compiling process Polonius fits
@@ -315,11 +315,11 @@ As lifetimes are a part of a variable's types, they can be referred to by name
 like any other type using the syntax \InRust{&'lifetime}. In the literature, the
 terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
 lifetime''~\nocite{noauthor_rfc_2019}, and ``reference
-provenance''~\cite{weiss_oxide:_2019} are all employed. As the section heading
-suggests, I will use the last one of them, as I believe it best captures the
-concept.
+provenance''~\cite{weiss_oxide:_2019} (RefProv) are all employed. As the section
+heading suggests, I will use the last one of them, as I believe it best captures
+the concept.
 
-From a type system perspective, the reference provenance is part of the type of
+From a type system perspective, the RefProv is part of the type of
 any reference and corresponds to the borrow expressions that might have
 generated it. For example, if a reference \InRust{r} has the type \InRust{&'a
   Point}, \InRust{r} is only valid as long as the terms of the loans in
@@ -355,17 +355,79 @@ between the regions, as seen in Formula~\ref{eq:subtype}.
 
 \fixme{How to incorporate the fact that this is with respect to the current point?}
 
-Finally, when talking about the \emph{liveness} of a reference provenance $r$, we will
-mean that $r$ occurs (\fixme{what does occurs mean? Does it encompass exploded
-  subset-types etc?}) in the type of a variable that is live at some point in the
-control-flow graph $p$, with the meaning that any of the loans in $r$ might be
-dereferenced at control-flow points reachable from $p$, and thus that the terms of
-the loans in $r$ must be respected at that point.
+Finally, when talking about the \emph{liveness} of a RefProv $r$, we will mean
+that $r$ occurs (\fixme{what does occurs mean? Does it encompass exploded
+  subset-types etc?}) in the type of a variable that is live at some point in
+the control-flow graph $p$, with the meaning that any of the loans in $r$ might
+be dereferenced at control-flow points reachable from $p$, and thus that the
+terms of the loans in $r$ must be respected at that point.
 
 
 \section{Deallocation As a Special Case of Variable Use}
+\label{sec:deall-as-spec}
+
 \fixme{describe the difference between drop-uses and normal uses and what is
   even a drop.}
+
+When Rust's variables go out of scope, they are implicitly deallocated, or
+dropped in Rust parlance. Explicit deallocation is also possible by calling the
+function \InRust{drop()}, which takes ownership of a variable and performs
+deallocation, or, for complex objects, calls the \InRust{drop()} method. For
+some types of variables, such as integers, deallocation is not necessary and the
+compiler generates no actual \InRust{drop()}:s.
+
+Rust provides a default deallocation method for data structures, but it can be
+overridden. This has repercussions on liveness calculations, because while the
+default deallocator for an object never needs to access its fields, a custom
+deallocator might access any of them. This means that any conditions of a loan
+that resulted in a reference $r$ stored in a \InRust{struct} instance $a$ must
+only be respected as far as \InRust{drop(a)} is concerned if $s$ implements a
+custom deallocator. If it does not, the loan of $r$ may be safely violated, as
+the default deallocator never dereferences $r$ and thus doesn't require $r$ to
+be valid. An illustration of this can be seen in
+Listing~\ref{lst:drop-liveness}.
+
+\begin{sourcecode}
+  \captionof{listing}{The custom deallocator for \InRust{OwnDrop} enforces the
+    loan of \InRust{data}, but the loan in \InRust{OwnDrop} is effectively dead
+    and thus can be violated.}\label{lst:drop-liveness}
+\begin{minted}{rust}
+#[derive(Debug)]
+struct OwnDrop<'a> {
+    data: &'a u32,
+}
+
+struct DefaultDrop<'a> {
+    data: &'a u32,
+}
+
+impl<'a> Drop for OwnDrop<'a> {
+    fn drop(&mut self) {
+        // the drop() method does something to the data
+        println!("dropping, we had {:?}", self.data);
+    }
+}
+
+fn main() {
+    let mut x = 13;
+    let a = OwnDrop { data: &x };
+
+    let mut y = 12;
+    let b = DefaultDrop { data: &y };
+    
+    // let mutrefa = &mut x;
+    // Causes an error (if used): the loan of x must be respected...
+    
+    // ...but the loan of y need not be!
+    let mutref = &mut y;
+    *mutref = 17;
+    println!("mutref {}", mutref);
+    
+    // all variables are implicitly dropped here
+    
+}
+\end{minted}
+\end{sourcecode}
 
 \section{Datalog}
 \label{sec:datalog}
@@ -387,46 +449,47 @@ the loans in $r$ must be respected at that point.
 \label{sec:input-facts}
 \fixme{Verify the terminology for this in Datalog parlance!}
 
-\begin{minted}{rust}
-    /// `borrow_region(R, B, P)` -- the region R may refer to data
-    /// from borrow B starting at the point P (this is usually the
-    /// point *after* a borrow rvalue)
-    pub borrow_region: Vec<(R, L, P)>,
+\begin{description}
+\item[\InDatalog{borrow_region(R, B, P)}] the region $R$ may refer to data from
+  borrow $B$ starting at the point $P$ (this is usually the point \emph{after} a
+  borrow rvalue).
+  
+\item[\InDatalog{universal_region(R)}] \fixme{this is a "free region" within fn body}
+  
+\item[\InDatalog{cfg_edge(P,Q)}] whenever there is a relation $P \rightarrow Q$
+  in the control flow graph.
+    
+\item[\InDatalog{killed(B,P)}] when some prefix of the path borrowed at $B$ is
+  assigned at point $P$.
+    
+\item[\InDatalog{outlives(R1, R2, P)}] \fixme{when we require `R1@P: R2@P`}
+    
+\item[\InDatalog{invalidates(P, L)}] when the loan $L$ is invalidated at point $P$.
+    
+\item[\InDatalog{var_used(V, P)}] when the variable $V$ is used for anything but
+  a drop at point $P$.
+    
+\item[\InDatalog{var_defined(V, P)}] when the variable $V$ is assigned to
+  (killed) at point $P$.
+  
+\item[\InDatalog{var_drop_used(V, P)}] when the variable $V$ is used in a drop at point $P$.
 
-    /// `universal_region(R)` -- this is a "free region" within fn body
-    pub universal_region: Vec<R>,
+\item[\InDatalog{var_uses_region(V, R)}] when the type of $V$ includes the RefProv
+  $R$.
 
-    /// `cfg_edge(P,Q)` for each edge P -> Q in the control flow
-    pub cfg_edge: Vec<(P, P)>,
+\item[\InDatalog{var_drops_region(V, R)}] when the type of $V$ includes the
+  RefProf $R$, and $V$ also implements a custom drop method which might need all
+  of $V$'s data, as discussed in Section~\ref{sec:deall-as-spec}.
+\end{description}
 
-    /// `killed(B,P)` when some prefix of the path borrowed at B is assigned at point P
-    pub killed: Vec<(L, P)>,
-
-    /// `outlives(R1, R2, P)` when we require `R1@P: R2@P`
-    pub outlives: Vec<(R, R, P)>,
-
-    ///  `invalidates(P, L)` when the loan L is invalidated at point P
-    pub invalidates: Vec<(P, L)>,
-
-    /// `var_used(V, P) when the variable V is used for anything but a drop at point P`
-    pub var_used: Vec<(V, P)>,
-
-    /// `var_defined(V, P) when the variable V is overwritten by the point P`
-    pub var_defined: Vec<(V, P)>,
-
-    /// `var_used(V, P) when the variable V is used in a drop at point P`
-    pub var_drop_used: Vec<(V, P)>,
-
-    /// `var_uses_region(V, R) when the type of V includes the region R`
-    pub var_uses_region: Vec<(V, R)>,
-
-    /// `var_drops_region(V, R) when the type of V includes the region R and uses
-    /// it when dropping`
-    pub var_drops_region: Vec<(V, R)>,
-\end{minted}
 
 \subsection{Reference Liveness}
 \label{sec:var-livenes}
+
+The basic liveness of a variable is defined as follows: if a variable $v$ is
+live in some point $q$ and $q$ is reachable from $p$ in the control-flow graph,
+then $v$ is live in $p$ too unless it was overwritten; in essence liveness is
+propagated backwards through the CFG.
 
 \begin{minted}{prolog}
 var_live(V, P) :-
@@ -434,6 +497,27 @@ var_live(V, P) :-
     cfg_edge(P, Q),
     !var_defined(V, P).
 \end{minted}
+
+There is also a very similar relation for drop-liveness with an identical shape
+and different input relations corresponding to drop-uses.
+
+
+Both of these are then used to calculate the reference liveness relation, which
+serves as input for the rest of the borrow checker. A given RefProv $r$ is live
+at some point $p$ if it is in the type of a variable $v$ which is either
+drop-live or use-live at $p$, with some notable caveats for drop-liveness
+discussed in Section~\ref{sec:deall-as-spec}.
+
+\begin{minted}{prolog}
+region_live_at(R, P) :-
+    var_drop_live(V, P),
+    var_drops_region(V, R).
+        
+region_live_at(R, P) :-
+        var_live(V, P),
+        var_uses_region(V, R).
+\end{minted}
+
 
 
 \subsection{Loan Constraint Propagation}
