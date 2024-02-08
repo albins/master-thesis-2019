@@ -4,6 +4,7 @@ all: Thesis.pdf
 
 clean:
 	latexmk -CA
+	rm -rf _minted-Thesis
 
 Thesis.pdf: Thesis.tex bibliography.bib
 	source activate $(PYGMENTS_VENV) \

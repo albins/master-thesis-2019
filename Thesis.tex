@@ -16,8 +16,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-\documentclass{UUThesisTemplate}
-%\documentclass[11pt,a4paper,twoside,openany]{report}
+%\documentclass{UUThesisTemplate}
+\documentclass[11pt,a4paper,twoside,openany]{report}
 
 \author{Albin Stjerna}
 \date{\today}
@@ -37,7 +37,7 @@
 	\setmainfont{Baskerville}
   \setromanfont{Baskerville}
 	\setsansfont{Helvetica Neue}
-	\setmonofont{Source Code Pro} % only minted!
+	%\setmonofont{Source Code Pro} % only minted!
 \else
 	% Plain LaTeX specific packages and settings
 	% Language, diacritics and hyphenation
@@ -65,6 +65,10 @@
 \usepackage{bm}
 \usepackage{longtable}
 \usepackage{lipsum}
+\usepackage{sectsty}
+
+\usepackage[lining]{sourcecodepro}
+\allsectionsfont{\normalfont\sffamily\bfseries}
 
 \clubpenalty 4000
 \widowpenalty 4000
@@ -83,7 +87,7 @@
 \bibliography{bibliography.bib}
 
 % Numbering of headings down to the subsection level
-\numberingdepth{subsection}
+%\numberingdepth{subsection}
 
 % Including headings down to the subsection level in contents
 %\contentsdepth{subsection}
@@ -105,7 +109,6 @@
 \usepackage{csquotes}
 \usemintedstyle{xcode}
 \setminted{fontsize=\footnotesize}
-%\setminted{fontseries=Source Code Pro}
 
 \setnowidow[5]
 \setnoclub[3]
@@ -242,7 +245,15 @@ Formally, the semantics of Rust's lifetime rules has been captured in the
 language Oxide, described by
 \citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}
 
-% FIXME describe what was already there when I came
+% UPDATE: make sure that this section is up to date:
+The contributions made within the scope of the thesis project specifically
+includes the implementation of liveness and initialisation calculations
+(Sections~\ref{sec:var-livenes} and~\ref{sec:var-initalisation} respectively),
+as well as work on region inference for higher-ranked types, as well as the
+evaluation and analysis of the system. The core algorithms of the Polonius for
+the region constraints were already written.
+
+
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
 Most of these examples are borrowed from
 \citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
@@ -277,7 +288,7 @@ Most of these examples are borrowed from
     let y = &pt; // This is fine
   \end{minted}
 \item[There can only be one simultaneous live unique reference] Whenever a
-  unique reference is created, with \InRust{& mut}, it must be unique:
+  unique reference is created, with \InRust{&mut}, it must be unique:
   \begin{minted}{rust}
     struct Point(u32, u32);
     
