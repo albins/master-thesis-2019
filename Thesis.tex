@@ -55,6 +55,8 @@
 \fi
 
 \usepackage{listings}
+\usepackage{chngcntr}
+\usepackage{chngcntr}
 \usepackage{fancyvrb}
 \usepackage{multicol}
 \usepackage[font={small,it}]{caption}
@@ -153,6 +155,12 @@
 \title{Modelling Rust's Reference Ownership Analysis Declaratively in Datalog}
 
 \begin{document}
+% Sync the counters:
+\counterwithin{listing}{section}
+\counterwithin{figure}{section}
+\counterwithin{table}{section}
+\counterwithin{equation}{section}
+
 % %\frontmatter*
 %     % Creates the front matter (title page(s), abstract, list of papers)
 %     % for either a Comprehensive Summary or a Monograph.
@@ -183,12 +191,12 @@
   repositories found on GitHub and the Crates.io Rust package index. Some
   central findings from the study are that deallocations are uncommon relative
   to other variable uses, and that the full flow-sensitive analysis is typically
-  seldom needed. Indeed, surprisingly many functions (circa \fixme{60}\%)
-  actually do not create any references at all, and therefore does not need
-  (most of) the Polonius analysis. Another conclusion from the study is that
-  control-flow graph size and number of variables in the function under analysis
-  seems to have the highest correlation to longer solve-times, and would
-  therefore be useful proxies for the difficulty of an input.}
+  seldom needed. Indeed, surprisingly many functions (circa 64\%) actually do
+  not create any references at all, and therefore does not need (most of) the
+  Polonius analysis. Another conclusion from the study is that control-flow
+  graph size and number of variables in the function under analysis seems to
+  have the highest correlation to longer solve-times, and would therefore be
+  useful proxies for the difficulty of an input.}
 
 
 \begingroup
@@ -275,7 +283,7 @@ program analysis\cite{Madsen:2016:DFD:2908080.2908096}.
 
 In addition to being context-sensitive, Rust's borrow checker is also
 flow-sensitive (i.e. performs analysis for each program point), like the system
-described by \citeauthor{Hardekopf:2009:SFP:1480881.1480911}, and whose form is
+described by \citeauthor*{Hardekopf:2009:SFP:1480881.1480911}, and whose form is
 very similar to the analysis performed in practice by
 Polonius~\cite{Hardekopf:2009:SFP:1480881.1480911}.
 
@@ -283,13 +291,13 @@ A \citeyear{scholz_fast_2016}~study uses the Souffl{\'e} system, which
 synthesizes performant C++ code from the Datalog specifications, similar to how
 Datafrog embeds a minimal solver as a Rust library, to show promising
 performance for analysis of large programs~\cite{scholz_fast_2016}. The
-\textsc{Doop} system, developed by \citeauthor{smaragdakis_using_2010}, also
+\textsc{Doop} system, developed by \citeauthor*{smaragdakis_using_2010}, also
 shows that explicit tuple storage sometimes vastly outperforms BDDs in terms of
 execution time~\cite{smaragdakis_using_2010}, as do sparse
 bitmaps~\cite{Hardekopf:2007:AGF:1250734.1250767}.
 
 Formally, the semantics of Rust's lifetime rules have been captured in the
-language Oxide, described by \citeauthor{weiss_oxide:_2019} in a draft paper
+language Oxide, described by \citeauthor*{weiss_oxide:_2019} in a draft paper
 which describes a minimal Rust-like language called Oxide along with its type
 system~\cite{weiss_oxide:_2019}. Oxide is notable in that it shares Polonius'
 view of variables as sets of possible points in the code that would give rise to
@@ -311,7 +319,7 @@ are marked with~(\notmine{}).
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
 This section will demonstrate the rules enforced by the borrow check. Most of
 these examples are taken directly or slightly modified from
-\citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
+\citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 
 \begin{description}  
 \item[Variables must be provably initialised before use] Whenever a variable is
@@ -568,7 +576,7 @@ respected at that point.
 \section{Reference Ownership as a Type System}\label{sec:type-system}
 
 In this section, we will relate Polonius to the ongoing work of
-\citeauthor{weiss_oxide:_2019} on formalising the reference ownership rules of
+\citeauthor*{weiss_oxide:_2019} on formalising the reference ownership rules of
 Rust into the formally defined type system Oxide~\cite{weiss_oxide:_2019}. The
 rules presented here are based on the 2019 draft version of the paper, and will
 change substantially in the paper's final version.
@@ -593,7 +601,7 @@ beyond the scope of our comparison here.
 
 At the heart of the type system lies the flow-sensitive typing judgments seen in
 Rules~\ref{eq:t-move} and~\ref{eq:t-borrow}, both taken from
-\citeauthor{weiss_oxide:_2019}'s paper (Figure~1). The first
+\citeauthor*{weiss_oxide:_2019}'s paper (Figure~1). The first
 rule~\eqref{eq:t-move} shows that for a given environment~$\Gamma$, a move of a
 given variable~$\pi$ (occurring if $\pi$ cannot be copied, which is what the
 right prerequisite says) is only valid if~$\pi$ is uniquely usable (that is, is
@@ -1397,7 +1405,7 @@ not~\cite{matsakis_polonius_2019-1}.
 
 The final missing functionality in Polonius is interaction with higher-ranked
 (generic, etc) subtyping arising from generic functions or trait-matching. The
-problem was described in a blog entry by \citeauthor{matsakis_polonius_2019} and
+problem was described in a blog entry by \citeauthor*{matsakis_polonius_2019} and
 will require extensions in the Rust compiler, which would produce simpler
 constraints than the universally and existentially quantified constraints
 generated by the type checker for Polonius to
@@ -1409,7 +1417,7 @@ this has not even reached the planning stage.
 \label{sec:missing-features:provenance-variable-equality}
 
 During the work for this thesis, a shortcoming in both Polonius and (probably)
-\citeauthor{weiss_oxide:_2019}'s Oxide, discussed in
+\citeauthor*{weiss_oxide:_2019}'s Oxide, discussed in
 Section~\ref{sec:type-system} was discovered, which would generate spurious
 errors in examples like Listing~\ref{lst:polonius-reformulation-bug} where an
 imprecision in the tracking of subset relations would cause a loan to be
@@ -1538,20 +1546,19 @@ from Crates.io and number of stars on GitHub.~\footnote{Source code for the
 selected repositories only about 1 000 were from other sources than GitHub. Only
 crates that compiled under recent versions of Rust nightly builds with
 non-linear lifetimes enabled were kept. The source code of the packages was then
-translated to Polonius input files for a total of \fixme{400}~GBs~of
-tab-separated tuples for \fixme{3~077~887}~functions, which we used to measure
-Polonius solve-time performance as well as for finding common patterns in the
-input data. Only complete data sets were considered; a repository with more than
-one target where at least one target did not compile was discarded, as was any
-repository where the analysis of input facts took more than 30~minutes, required
-more memory than what was available, or where the initial fact generation phase
-took longer than $30$~minutes. After this selection process,
-\fixme{10~613}~repositories remained for the final study, each of which
-contained at least one, but possibly multiple crates. The analysis assumed that
-all functions in all crates and all targets of a repository were unique, as the
-outputs were stored per-repository. The median number of functions in the
-dataset was \fixme{47}, including functions generated by desugaring as well as
-user-written functions.
+translated to Polonius input files for a total of 340~GBs~of tab-separated
+tuples for 3~939~171~functions, which we used to measure Polonius solve-time
+performance as well as for finding common patterns in the input data. Only
+complete data sets were considered; a repository with more than one target where
+at least one target did not compile was discarded, as was any repository where
+the analysis of input facts took more than 30~minutes, required more memory than
+what was available, or where the initial fact generation phase took longer than
+30~minutes. After this selection process, 12~036~repositories remained for the
+final study, each of which contained at least one, but possibly multiple crates.
+The analysis assumed that all functions in all crates and all targets of a
+repository were unique, as the outputs were stored per-repository. The median
+number of functions in the dataset was 48, including functions generated by
+desugaring as well as user-written functions.
 
 All experiments were run on a dedicated desktop computer running a 64-bit
 version of Ubuntu~19.04 with Linux 5.0.0-20-generic. The machine had 16~GBs of
@@ -1568,17 +1575,20 @@ of the build process that would involve Polonius. Therefore all non-compiling
 crates were excluded from the study.
 
 Additionally, we also excluded all functions that had no loans at all from the
-analysis, a surprisingly large portion; almost \fixme{47}\%. This is most likely
+analysis, a surprisingly large portion; slightly above 64\%. This is most likely
 due to code generation producing short ``functions'' that does not actually
-involve any borrowing at all.
+involve any borrowing at all. After discarding these, 11~687 repositories
+remained.
 
 The main metric of ``performance'' in this study is the time it would take
 Polonius to solve a given set of inputs from a cold start. This also includes
-the time it takes to parse the files of tab-separated input tuples, which is
-assumed to be negligible compared to the runtime of the analysis itself, which
-includes the entire analysis described here;initialisation, liveness, and the
-borrow check. In practical scenarios the peak memory usage of the analysis would
-also be an interesting metric.
+the time it takes to parse the files of tab-separated input tuples,
+initialisation, liveness, and the borrow check. In practical scenarios the peak
+memory usage of the analysis would also be an interesting metric. Additionally,
+a future benchmarking scenario should use Polonius to benchmark itself rather
+than an external wall-clock, allowing for more precise measurements excluding
+parsing and deserialisation and reporting separate runtimes for the three
+phases of the calculation.
 
 When studying inputs to Polonius, we am mainly interested in two properties; how
 large and how complex the function under analysis is. Neither of these can be
@@ -1596,11 +1606,12 @@ only when that one produces an error (\textsc{Hybrid}). The intention is to have
 such a hybrid algorithm re-use the information gained by the simpler analysis to
 accelerate the more advanced analysis, but such functionality was not yet
 implemented at the time of the experiments. This mode also performs the full
-liveness and initialisation analysis twice, slightly penalising it.
+liveness and initialisation analysis twice, penalising it in the
+comparison.
 
 The box plots in Figures~\ref{fig:solvetimes},~\ref{fig:solvetimes-long},
 and~\ref{fig:input-sizes} are all Tukey plots; the green line shows the median,
-the box the 1 and 3rd quartile, and the whiskers are placed at 1.5 times the
+the box the 1 and 3rd quartile, and the whiskers are placed at 1.5~times the
 interquartile range. Outliers are not plotted, as the size of the input
 generated too many outliers for the plots to be readable.
 
@@ -1661,9 +1672,9 @@ A typical Polonius input consists of a small number of tuples for most
 relations, as seen in Figure~\ref{fig:input-sizes}. In particular, most
 control-flow graphs are small in terms of number of nodes, and most functions
 only contain a small number of variables, with an even smaller number of loans.
-Drops are particularly rare, with \fixme{71}\% of all studied functions having
-no (potential) drop-uses at all (\fixme{0 median, 3.6 mean}), and only very few
-loans (\fixme{2~median, 5.4~mean}). This can also be seen in
+Drops are particularly rare, with circa~70\% of all studied functions having
+no (potential) drop-uses at all (0 median, 7.6 mean), and only very few
+loans (2~median, 5~mean). This can also be seen in
 Figure~\ref{fig:input-var-drop-used} showing the distribution of number of
 (potential) drop-uses per function.
 
@@ -1675,8 +1686,8 @@ However, repositories can be assumed to be typically compiled all at once.
 Therefore, it is also interesting to say something about the maximum input size
 per repository, under the assumption that few large functions would dominate the
 solve-time for that repository. After collecting the maximum values per repository,
-the median number of loans was~\fixme{24}, and the median number of potential drop-uses
-was~\fixme{20} (regular uses was, for comparison, \fixme{174}).
+the median number of loans was~24, and the median number of potential drop-uses
+was~45 (regular uses was, for comparison, 177).
 
 We attempted to perform a principal-component analysis (PCA) of the input data
 in order to visually identify possible clusterings of types of inputs, but the
@@ -1685,29 +1696,44 @@ neither 2 nor 3 dimensions, suggesting that most inputs are in some sense
 typical, or that PCA is ineffective here.
 
 \subsection{How Inputs Affect Solve-Time}\label{sec:inputs:correlation}
-
-A heatmap of the (Pearson) correlation between input size and solve-time for the
-various variants can be seen in Figure~\ref{fig:corr-heatmap}, while a scatter
-plot of the results with a linear regression for some interesting pairs of
-inputs can be seen in Figure~\ref{fig:input-scatter}.
-
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/corr_heatmap.pdf}
   \caption{Heatmap of Pearson~correlations between various input size metrics
-    and solve-times for all three Polonius implementations, suggesting that in
-    particular the number of variables and size of the CFG affect solve-time.}
+    and solve-times for all three Polonius implementations, suggesting in
+    particular that variable uses, number of variables, and the number of
+    provenance variables heavily affect runtime.}
   \label{fig:corr-heatmap}
 \end{figure}
+A heatmap of the (Pearson) correlation between input size and solve-time for the
+various variants on long-running jobs (as previously defined to be jobs taking
+at least 1~s and no more than 50~s to run under \textsc{Naive}) can be seen in
+Figure~\ref{fig:corr-heatmap} and Table~\ref{tab:correlations}, while a scatter
+plot of the results with a linear regression for some interesting pairs of
+inputs can be seen in Figure~\ref{fig:input-scatter}.
+
+\begin{table}[ht]
+  \input{correlations.tex}
+  \caption{Pearson correlations between size of inputs and the runtime of
+    \textsc{Naive}, \textsc{Hybrid}, and \textsc{DatafrogOpt} respectively, from
+    high correlation to \textsc{DatafrogOpt} runtime to low.}
+  \label{tab:correlations}
+\end{table}%
+
+It is clear here that inputs affecting all parts of the computation (notably
+liveness) have a larger influence, notably variable uses, number of variables,
+and the number of provenance variables. In particular, input sizes affecting the
+liveness computation time affects \textsc{Hybrid}, which should be no surprise
+as it does that computation twice. The same goes for the number of provenance
+variables, which figure in the second two parts of the analysis. Another
+conclusion from Table~\ref{tab:correlations} is that the number of nodes of the
+CFG has a lower impact on runtime than its number of edges, reflecting that
+complex CFGs with many branchings take more time to compute than linear ones.
 
 Both results suggest only a very weak linear relation between input sizes and
-and the solve-time with the naive algorithm, while a clearer relation can be
-found between the two optimisations and input sizes respectively. In particular,
-the number of loans and number of nodes in the control-flow graph seems to
-affect runtime performance, which is hardly surprising: the number of CFG~nodes
-(along with the number of variables) would affect how many times constraint
-propagation would happen, and the number of loans and variables would affect the
-size of the propagations for the borrow check and liveness analyses
-respectively.
+and the solve-time with \textsc{Naive}, while a clearer relation can be
+found between \textsc{DatafrogOpt} and input sizes respectively. \textsc{Naive},
+on the other hand, does not show similarly clear correlations between runtime
+and input sizes of any kind (Table~\ref{tab:correlations}).
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/corr_scatter.pdf}
