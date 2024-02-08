@@ -207,6 +207,18 @@ validation of Rust's memory safety guarantees.
 
 \fixme{mention results.}
 
+\section{On Voices and Situated Knowledges}\label{sec:situated-knowledge}
+
+I have chosen to use an active voice for most of this thesis. As there is a
+difference between views held or contributions made by me personally, I have
+opted, perhaps controversially, to use ``I'' rather than ``we''. However,
+following~\citeauthor{haraway}'s insights~\cite{haraway}, I would like to ground
+the knowledge I have produced during my work on this thesis in the greater Rust
+community. As laid out in the (current) foreword
+of~\citetitle{nichols_rust_nodate}, Rust is itself situated within a greater
+project of empowering users, or perhaps rather communities of users, to do
+greater things~\cite{nichols_rust_nodate}.
+
 \chapter{Background}
 Whenever a reference to a resource is created in Rust, its borrowing rules
 described in Section~\ref{sec:borrowing-rules} must be respected for as long as
@@ -284,7 +296,8 @@ completeness. For clarity, sections detailing components not developed by me are
 marked with~(\notmine{}).
 
 \section{The Borrowing Rules}\label{sec:borrowing-rules}
-Most of these examples are borrowed from
+This section will demonstrate the rules enforced by the borrow check. Most of
+these examples are borrowed directly or only slightly modified from
 \citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 
 \begin{description}  
