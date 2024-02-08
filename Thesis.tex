@@ -17,7 +17,7 @@
 
 
 %\documentclass{UUThesisTemplate}
-\documentclass[11pt,a4paper,twoside,openany]{report}
+\documentclass[11pt,a4paper,twoside]{book}
 
 \author{Amanda Stjerna}
 \date{\today}
@@ -56,6 +56,11 @@
 \usepackage{lipsum}
 \usepackage{sectsty}
 \usepackage{amsmath}
+\usepackage{afterpage}
+\newcommand\blankpage{%
+  \null
+  \thispagestyle{empty}%
+  \newpage}
 \usepackage{amssymb}
 
 %\usepackage[lining]{sourcecodepro}
@@ -72,7 +77,7 @@
             urlcolor=blue,breaklinks]{hyperref}
 %\def\UrlBreaks{\do\/\do-}
 %\usepackage{breakurl}
-            
+
 \usepackage[
     backend=biber,
     natbib=true,
@@ -160,6 +165,8 @@
 
 \begin{document}
 
+\frontmatter
+
 % %\frontmatter*
 %     % Creates the front matter (title page(s), abstract, list of papers)
 %     % for either a Comprehensive Summary or a Monograph.
@@ -175,7 +182,9 @@
 
 \maketitle
 
-\section*{Abstract}
+%\blankpage
+
+\chapter*{Abstract}
 
 Rust is a modern systems programming language that offers improved memory safety
 over traditional languages like C or C++ as well as automatic memory management
@@ -204,17 +213,18 @@ sufficient to prove a program correct. Indeed, many functions (circa 64\%) do
 not create any references at all, and therefore do not involve the
 reference-analysis part of the borrow check.
 
+%\afterpage{\blankpage}
 
 \begingroup
         % To adjust the indentation in your table of contents, uncomment and enter the widest numbers for each level
         %  E.g.  \settocnumwidth{widest chapter number}{widest section number}{widest subsection number}...{...}
        %  \settocnumwidth{5}{4}{5}{3}{3}{3}
   \tableofcontents
-  \listoffigures
-  \listoftables
+  {\listoffigures\let\cleardoublepage\clearpage\listoftables}
 \endgroup
-  \newpage
-\section*{Acknowledgements}
+\newpage
+
+\chapter{Acknowledgements}
 \epigraph{We seek not the knowledges ruled by phallogocentrism (nostalgia for
   the presence of the one true Word) and disembodied vision. We seek those ruled
 by partial sight and limited voice---not partiality for its own sake but, rather,
@@ -223,8 +233,6 @@ possible. Situated knowledges are about communities, not about isolated
 individuals. \textbf{The only way to find a larger vision is to be somewhere in
   particular}}%
 {Donna Haraway, \citetitle{haraway}~(\citeyear{haraway}), emphasis mine}
-
-{\footnotesize
 
   Being easily confused about reality in general, one of my epistemologic
   touchstones is Donna Haraway's notion of \textit{situated knowledges}, as
@@ -268,7 +276,7 @@ individuals. \textbf{The only way to find a larger vision is to be somewhere in
   (pronounced ``liquid''), and Matthew Jasper, who all answered my dumb
   questions at one point or other.
 
-}
+\mainmatter
 
 \chapter{Introduction}
 \epigraph{Something is rotten in the state of Denmark}%
@@ -531,7 +539,7 @@ borrowed from \citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
      }
 
      // ERROR: x not initialized:
-     let y = |\badexample{x}| + 1; 
+     let y = |\badexample{x}| + 1;
     \end{minted}
   \end{minipage} \\
   Move-Deinit&% Positive example of move-deinit
@@ -560,10 +568,10 @@ borrowed from \citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 \begin{minted}[escapeinside=||, autogobble]{rust}
 struct Point(u32, u32);
 let mut pt = Point(13, 17);
-    
+
 let x = |\goodexample{&pt}|;
 let y = |\goodexample{&pt}|;
-    
+
 dummy_use(|\goodexample{x}|); dummy_use(|\goodexample{y}|);
 \end{minted}
 \end{minipage}&% Negative example of shared-readonly
@@ -571,7 +579,7 @@ dummy_use(|\goodexample{x}|); dummy_use(|\goodexample{y}|);
 \begin{minted}[escapeinside=||, autogobble]{rust}
 struct Point(u32, u32);
 let mut pt = Point(13, 17);
-    
+
 let x = |\goodexample{&pt}|;
 // ERROR: assigned to
 //   borrowed value:
@@ -584,7 +592,7 @@ dummy_use(|\goodexample{x}|);
 \begin{minted}[escapeinside=||, autogobble]{rust}
 struct Point(u32, u32);
 let mut pt = Point(13, 17);
-    
+
 let x = |\goodexample{&mut pt}|;
 let y = |\goodexample{&mut pt}|;
 
@@ -596,7 +604,7 @@ dummy_use(|\goodexample{y}|);
     \begin{minted}[escapeinside=||, autogobble]{rust}
 struct Point(u32, u32);
 let mut pt = Point(13, 17);
-    
+
 let x = |\badexample{&mut pt}|;
 // ERROR: cannot borrow `pt`
 // as mutable more than once:
@@ -629,7 +637,7 @@ let x = {
 
 // ERROR: pt does not live
 // long enough:
-let z = |\badexample{x.0}|; 
+let z = |\badexample{x.0}|;
 \end{minted}
   \end{minipage}
 \end{tabular}
@@ -1197,7 +1205,7 @@ atoms used in Polonius can be found in Table~\ref{tab:input-atoms}.
                              \begin{tabular}[t]{@{}l l@{}}
                                \InRust{bb0[0]}: &\InRust{_3 = &_1;} \\
                                \InRust{bb0[1]}: &\InRust{_3 = &_2;}
-                             \end{tabular}                                                    
+                             \end{tabular}
                       &
                         \InRust{(&_1, M(bb0[1]))}
                                            & Bck \\
@@ -1229,7 +1237,7 @@ atoms used in Polonius can be found in Table~\ref{tab:input-atoms}.
                          \InRust{(x.1.0, x.1)},\\
                          \InRust{(x.1.1, x.1)}\\
                         \end{tabular}
-                                                           
+
 
 
        & Init  \\
@@ -1349,7 +1357,7 @@ reflecting the fact that ancestry is respectively either direct parenthood or
 transitive parenthood:
 \begin{minted}{prolog}
 ancestor(Mother, Daughter) :- child(Daughter, Mother).
-ancestor(Grandmother, Daughter) :- 
+ancestor(Grandmother, Daughter) :-
     child(Mother, Grandmother),
     ancestor(Mother, Daughter).
 \end{minted}
@@ -1485,8 +1493,8 @@ Listing~\ref{lst:datafrog:region-live-at}.
     Datafrog.}\label{lst:datafrog:region-live-at}
 \begin{minted}{rust}
 region_live_at_var.from_join(
-    &var_drop_live_var, 
-    &var_drops_region_rel, 
+    &var_drop_live_var,
+    &var_drops_region_rel,
     |_v, &p, &r| {
         ((r, p), ())
     });
@@ -1686,12 +1694,12 @@ var_use_live(V, P) :-
                      \InRust{var_used(x, Start(bb0[1]))}\\
                      \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}
                    \end{tabular} &%
-                                   
+
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_use_live(x, Mid(bb0[0]))} \\
                      \InRust{var_use_live(x, Start(bb0[1]))}
                    \end{tabular}
-                       
+
                  \end{tabular}\\
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
                    Input & Conclusion \\ \toprule
@@ -1702,7 +1710,7 @@ var_use_live(V, P) :-
                    \end{tabular} &%
                                    (nothing)
                  \end{tabular}\\
-    \end{tabular}    
+    \end{tabular}
   }
 
   \caption[Rules for Calculating Use-Liveness]{The rules for calculating
@@ -1767,14 +1775,14 @@ fn main() {
 
     let mut y = 12;
     let b = DefaultDrop { data: &y };
-    
+
     let mutrefa = &mut x;
     // ERROR: the loan of x must be respected...
-    
+
     // ...but the loan of y need not be!
     let mutref = &mut y;
     *mutref = 17;
-    
+
     // all variables are implicitly dropped here
 }
 \end{minted}
@@ -1852,9 +1860,9 @@ var_drop_live(V, P) :-
                    \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
                    \end{tabular} &%
                                    \InRust{var_drop_live(x, Mid(bb0[0]))}
-                   
+
                  \end{tabular}\\% End positive examples
-                   
+
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
                    Input & Conclusion \\ \toprule
                    \begin{tabular}[t]{@{}l}
@@ -1865,7 +1873,7 @@ var_drop_live(V, P) :-
                    \end{tabular} &%
                                    (nothing)
                  \end{tabular}\\
-    \end{tabular}    
+    \end{tabular}
   }
 
 \caption[Rules For Deriving Drop-Liveness]{The rules for calculating
@@ -1893,7 +1901,7 @@ example of this can be seen in Table~\ref{tab:liveness-example}.
 region_live_at(R, P) :-
     var_drop_live(V, P),
     var_drops_region(V, R).
-        
+
 region_live_at(R, P) :-
         var_use_live(V, P),
         var_uses_region(V, R).
@@ -1915,7 +1923,7 @@ region_live_at(R, P) :-
                    \end{tabular} &%
                                    \InRust{region_live_at('x, Mid(bb0[1]))}\\
                  \end{tabular}\\
-    \end{tabular}    
+    \end{tabular}
   }
 
 \caption[Rules for Deriving Live Provenance Variables]{A provenance variable is
@@ -2001,7 +2009,7 @@ safe to access a variable or if we should generate a move error, we
 under-estimate (Section~\ref{sec:move-errors}).
 
 {\renewcommand{\arraystretch}{1.0}
-  \begin{table}    
+  \begin{table}
 \begin{tabular}{@{}l l l l}
   Statement                & Maybe init                 & Maybe uninit            & Accessed \\ \toprule
   \InRust{let x = (2, 3)} & \InRust{x.0}, \InRust{x.1}, \InRust{x} &  & \\
@@ -2118,12 +2126,12 @@ var_maybe_partly_initialized_on_exit(Var, Node) :-
                      \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
                      \InRust{path_begins_with_var(x, x)}\\
                    \end{tabular} &%
-                                   
+
                    \begin{tabular}[t]{@{}l}
                      \InRust{var_m_i_e(x, Mid(bb0[0]))} \\
                      \InRust{var_m_i_e(x, Start(bb0[1]))}
                    \end{tabular}
-                       
+
                  \end{tabular}\\
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
                    Input & Conclusion \\ \toprule
@@ -2135,7 +2143,7 @@ var_maybe_partly_initialized_on_exit(Var, Node) :-
                    \end{tabular} &%
                                    \InRust{var_m_i_e(x, Start(bb0[0]))}
                  \end{tabular}\\
-    \end{tabular}    
+    \end{tabular}
   }
 
 \caption[Rules for Over-Approximating Variable Initialisation]{The rules for
@@ -2185,7 +2193,7 @@ move_error(Path, TargetNode) :-
     over-approximating initialisation in
     Figure~\ref{fig:var-initialised}.}\label{lst:path-maybe-moved}
 \begin{minted}{prolog}
-path_maybe_uninitialized_on_exit(Path, Node) :- 
+path_maybe_uninitialized_on_exit(Path, Node) :-
     path_moved_at(Path, Node).
 
 path_maybe_uninitialized_on_exit(Path, Node2) :-
@@ -2213,14 +2221,14 @@ path_maybe_uninitialized_on_exit(Path, Node2) :-
     \InDatalog{requires(Provenance, Loan, Node)}\notmine{} & Intermediate & This provenance contains this loan at this node. \\
     \InDatalog{loan_live_at(Loan, Node)}\notmine{} & Intermediate & This loan is live at this node. \\
     \InDatalog{error(Node)}\notmine{} & Output & A borrow check error (a violated loan) occurred at this node. \\
-    
+
   \end{tabular}
 \caption{Loan Constraint Propagation Dramatis Personae}\label{tab:polonius-facts-recap}
 \end{table}%
 }
 
 { \renewcommand{\arraystretch}{1.0}
-  \begin{table}[!htbp]    
+  \begin{table}[!htbp]
 \begin{tabular}{@{}l l l l l}
   Statement & Killed & Invalidates & New Constraints & Live prov:s \\ \toprule
   \InRust{let p: &'p i32 = &'1 x} & & &  \InRust{'1} $\subseteq$ \InRust{'p}, \InRust{&'1 x} $\in$ \InRust{'1} &  \\
@@ -2297,7 +2305,7 @@ subset(R1, R3, P) :-
                    \end{tabular} &%
                                    (nothing)
                  \end{tabular}\\
-    \end{tabular}    
+    \end{tabular}
   }
   \caption{Subset relations are transitive (as you would
     expect).}\label{fig:subset-transitive}
@@ -2346,7 +2354,7 @@ subset(R1, R2, Q) :-
                    \end{tabular} &%
                                    (nothing)
                  \end{tabular}\\
-    \end{tabular}    
+    \end{tabular}
   }
 
   \caption{Subset relations propagate across CFG~edges iff both of their
@@ -2379,8 +2387,8 @@ Listing~\ref{lst:requires-subset}.
     mathematical rule $\left( l \in R_1 \land R_1 \subseteq R_2 \right) \implies
     l \in R_2$.}\label{lst:requires-subset}
 \begin{minted}{prolog}
-requires(R2, L, P) :- 
-  requires(R1, L, P), 
+requires(R2, L, P) :-
+  requires(R1, L, P),
   subset(R1, R2, P).
 \end{minted}
 \end{sourcecode}
@@ -2414,9 +2422,9 @@ requires(R, L, Q) :-
                      \InRust{killed(&x, Start(bb0[0]))} $= \bot$\\
                      \InRust{cfg_edge(Start(bb0[0]), Mid(bb0[0]))}
                    \end{tabular} &%
-                                   
+
                    \InRust{requires('a, &x, Mid(bb0[0]))}
-                       
+
                  \end{tabular}\\
       $\bot$ & \begin{tabular}[t]{@{}l  l@{}}
                    Input & Conclusion \\ \toprule
@@ -2434,7 +2442,7 @@ requires(R, L, Q) :-
                    \end{tabular} &%
                                    (nothing; prov.var not live)
                  \end{tabular}\\
-    \end{tabular}    
+    \end{tabular}
   }
 
   \caption[Rule for Propagating Loans Across CFG Edges]{Loans propagate across
@@ -2549,7 +2557,7 @@ if something {
 if something {
   x = &z; // creates {L0} in 'x constraint.
           //
-          // at this point, we have 
+          // at this point, we have
           //   `'x subset-of 'y` and `{L0} in `'x`,
           //   so we also have `{L0} in 'y` (wrong).
   drop(x);
@@ -2591,7 +2599,7 @@ fn next<'buf>(buffer: &'buf mut String) -> &'buf str {
 
         // Start-point: invalidates(bw0)
         // Start-point: borrow_live_at = {}: no error!
-        let event = parse(buffer); 
+        let event = parse(buffer);
         // Mid-point: bw0 dies through assignment to event
         // borrow_live_at(bw0)
         if true { // borrow_live_at(bw0)
