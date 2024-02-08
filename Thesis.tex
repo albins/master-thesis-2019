@@ -378,42 +378,7 @@ account of Polonius design, implementation, and operation to date.
 % loans giving rise to references.}
 
 
-%\section{Variables, Places, and Paths}
-%\label{sec:vars-places-paths}
-
 \fixme{Rust uses traits~\cite{scharli2003traits}.}
-
-A notable detail of the borrow check is what is meant by a ``variable''. In
-Rust, some data structures, such as \InRust{struct}s (complex data types,
-corresponding to objects without methods), and tuples, are analysed at the
-granularity of the individual components, which may have arbitrarily deep
-nesting (known statically). This means that the following code, for example, is
-sound, as the loans do not overlap:
-\begin{minted}{rust}
-struct Point(u32, u32);
-
-let mut pt: Point = Point(6, 9);
-let x = &mut pt.0;
-let y = &mut pt.1;
-// no error; our loans do not overlap!
-\end{minted}
-
-In our instance, the root variable \InRust{pt} contains the \emph{paths}
-\InRust{pt.1} and \InRust{pt.2}. Such paths constitute a tree with its root in
-the variable itself. Both the core borrow check and the initialisation tracking
-that we will discuss reasons about variables on the path level. It is worth
-pointing out that dynamic structures like vectors, as well as arrays, are not
-analysed at this granularity, but are considered one single object.
-
-In Rust compiler parlance, we say that a path points to a \emph{place},
-corresponding literally to the place in memory holding its data.
-
-Finally, we sometimes talk of a path having \emph{prefixes}, where a prefix is
-anything above and including a ``leaf'' in the tree spanning all paths. For
-example, the path \InRust{x.y} would have the prefixes \InRust{x} and
-\InRust{x.y}. Prefixes will also come up in initialisation tracking, and in the
-borrow check itself.
-
 
 % quickly introduce borrow check, forward-refer
 
@@ -424,14 +389,47 @@ of the compilation process (see Chapter~\ref{fixme}), called the \textit{borrow
 called the \textit{borrow checker}. The specific rules enforced by the borrow
 checker are discussed in the next chapter (Chapter~\ref{cha:borrowing-rules}).
 
+
+\section{What Is Being Borrowed?}\label{sec:paths}
+
+The borrow check specifically tracks memory at the resolution of \textit{paths},
+that is paths to concrete memory. Examples of paths is \InRust{x} (a variable on
+the stack), \InRust{x.f} (a field of a \InRust{struct}), \InRust{*x.f} (a field
+accessed through a reference), or \InRust{(*x.f)[_]} (an index of an array
+stored in a \InRust{struct} and accessed through a reference). However, an array
+counts as one path, ignoring its indices. Paths constitute trees, (or perhaps
+rather Russian nesting dolls) such as in the example of \InRust{x.f}, where
+\InRust{x.f} lies under \InRust{x}. We say that each path preceding (and
+including) a given path are its \textit{prefixes}. The topmost path, the
+variable name itself, we call a \textit{root path}. Finally, we say that paths
+\textit{overlap} if one of them is a prefix of the other. Intuitively, this mean
+that they involve the same region in memory.
+
+
+The fact that the borrow check is performed on paths means that the following
+code, for example, is sound, as the paths, and therefore also the loans do not
+overlap:
+\begin{minted}{rust}
+struct Point(u32, u32);
+
+let mut pt: Point = Point(6, 9);
+let x = &mut pt.0;
+let y = &mut pt.1;
+// no error; our loans do not overlap!
+\end{minted}
+
+\section{Limitations Addressed By Polonius}\label{sec:limitations}
+
 Due to limitations in its formulation, the current borrow checker rejects code
-such as the one in Listing~\ref{lst:motivating-example}, as it is unable to prove that
-there are no two overlapping write references to the same location in memory
-(namely \InRust{buffer}). This limitation stems from a more constrained
+such as the one in Listing~\ref{lst:motivating-example}, as it is unable to
+prove that there are no two overlapping write references to the same location in
+memory (namely \InRust{buffer}). This limitation stems from a more constrained
 reasoning around program flow, which introduces imprecision into the analysis.
 Polonius is designed to address this imprecision by extending the reasoning
 power of the borrow check to be flow-sensitive, that is reason at the power of
-each individual program statement.
+each individual program statement. For a slightly longer explanation of the
+differences between the current borrow checker and Polonius, see
+Section~\ref{sec:reference-provenance}.
 
 \begin{sourcecode}
   \captionof{listing}[Motivating example for Polonius]{A motivating example for
@@ -457,7 +455,7 @@ fn parse<'buf>(_buffer: &'buf mut String) -> &'buf str {
 \end{sourcecode}
 
 The other reason for Polonius is to more clearly capture the semantics of the
-borrow check in a domain-specific language.
+borrow check in a domain-specific language. \fixme{expand.}
 
 \chapter{The Borrow Check: Enforcing Rust's Memory
   Model}\label{cha:borrowing-rules}
