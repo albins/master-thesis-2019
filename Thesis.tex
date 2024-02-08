@@ -166,6 +166,17 @@
 
 \setlength{\epigraphwidth}{0.55\textwidth}
 
+\usepackage{pifont}
+
+\newcommand{\decoline}{%
+   \par
+   \vspace{\baselineskip}
+   \hfill
+   \ding{100}
+   \hfill
+   \vspace{\baselineskip}
+\par}
+
 \begin{document}
 % Sync the counters:
 \counterwithin{listing}{section}
@@ -705,17 +716,6 @@ that as long as the conditions above the horizontal bar holds, the conclusion
 below it will hold; usually that an expression is sound with respect to the type
 system (it type-checks).
 
-Before going into the complexities of Oxide, we will start with a simplified
-typing judgement in Rule~\eqref{eq:s-ref-baby}, which says that a reference type
-is a subtype of another reference type iff their provenance variables are a
-subset. These typing judgements are implied on assignments with the intuition
-that you can only assign a right-hand side to a left-hand-side if the
-right-hand-side can function as a (is a subtype of) the left-hand-side. Such
-judgements will in practice be the main source of constraints on provenance
-variables in Polonius (the \InDatalog{outlives} fact described in
-Chapter~\ref{cha:borrow-check-compiler}). In other words, if type systems are
-not your cup of tea, you may skip the rest of this section.
-
 \begin{equation}\label{eq:s-ref-baby}
   \ntyperule{
     \rho_1 \subseteq \rho_2 \:\:\:\:\:\:\:\:
@@ -726,6 +726,19 @@ not your cup of tea, you may skip the rest of this section.
   }
 \end{equation}
 
+Before going into the complexities of Oxide, we will start with a simplified
+typing judgement in Rule~\eqref{eq:s-ref-baby}, which says that a reference type
+is a subtype of another reference type iff their provenance variables are a
+subset. These typing judgements are implied on assignments with the intuition
+that you can only assign a right-hand side to a left-hand-side if the
+right-hand-side can function as a (is a subtype of) the left-hand-side. Such
+judgements will in practice be the main source of constraints on provenance
+variables in Polonius (the \InDatalog{outlives(R1, R2, P)} fact described in
+Chapter~\ref{cha:borrow-check-compiler}). In other words, if type systems are
+not your cup of tea, you may skip the rest of this section and proceed with
+Section~\ref{sec:borrow-check-intuition}.
+
+\decoline
 
 Most of the conventions used in the Oxide formulation can be glossed over for
 the purposes of our understanding, but the most important ones are the type
@@ -779,7 +792,7 @@ $\omega$-reference to any variable $\pi$ of type $\tau$ where $\omega$-use is
 safe, and produce a reference of equal $\omega$~access to that variable of the
 type ``reference to a value of type,~$\tau$, with its provenance variable being
 the set containing only that loan, denoted $^{\omega}\pi$''. This corresponds to
-the input fact \InDatalog{borrow_region}, described in
+the input fact \InDatalog{borrow_region(R, L, P)}, described in
 Section~\ref{sec:input-facts}, and follows the intuition that if we create a
 reference, that reference is \emph{known} to point to whatever we borrowed to
 create the reference.
@@ -857,11 +870,11 @@ can be unified with the right-hand side (the prerequisite), and second that
 assignment will remove the previous mapping of $\pi_1$ in $\Gamma$ and replace
 it with the new expression. The call to the meta-function \texttt{places-typ} is
 used to expand $\pi$ into all its references and perform the assignment. This
-would correspond to the \InDatalog{killed} relation used in Polonius, where an
-old loan is removed from the environment whenever one of its prefixes is
-assigned. Additionally, Polonius would also have assignment and initialisation
-inputs for the liveness and initialisation tracking respectively, but those are
-beside the point of this discussion.
+would correspond to the \InDatalog{killed(L, P)} relation used in Polonius,
+where an old loan~$L$ is removed from the environment whenever one of its prefixes
+is assigned. Additionally, Polonius would also have assignment and
+initialisation inputs for the liveness and initialisation tracking respectively,
+but those are beside the point of this discussion.
 
 \begin{equation}\label{eq:t-assignment}
   \ntyperule{
@@ -1642,12 +1655,8 @@ the initialisation from the input's mid-point index (which is where a
 because a drop-use would only happen if the \InRust{x} was initialised on
 \textit{entry} to the instruction \InRust{drop(x)}.
 
+\begin{figure}
 \begin{sourcecode}
-  \captionof{listing}{The rules for calculating drop-liveness: the rules are
-    similar to those for to use-liveness (Listing~\ref{lst:var-live}), but
-    propagation of liveness only happens if the variable being dropped may be
-    initialised. Note that the rule for calculating initialisation on entry is
-    not transitive!}\label{lst:use-live}
 \begin{minted}{prolog}
 var_maybe_initialized_on_entry(V, Q) :-
     var_maybe_initialized_on_exit(V, P),
@@ -1665,6 +1674,46 @@ var_drop_live(V, P) :-
 \end{minted}
 \end{sourcecode}
 
+{ \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{@{}l l}
+      Positive & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{var_drop_used(x, Start(bb0[1]))}\\
+                     \InRust{var_maybe_initialized_on_exit(x, Mid(bb0[0]))}\\
+                     \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
+                   \end{tabular} &%
+                                   \InRust{var_drop_live(x, Start(bb0[1]))} \\ \hline
+                                   % End first positive example
+                   \begin{tabular}[t]{@{}l}
+                   \InRust{var_drop_live(x, Start(bb0[1]))}\\
+                   \InRust{var_maybe_initialized_on_exit(x, Mid(bb0[0]))}\\
+                   \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
+                   \end{tabular} &%
+                                   \InRust{var_drop_live(x, Mid(bb0[0]))}
+                   
+                 \end{tabular}\\% End positive examples
+                   
+      Negative & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{var_drop_live(x, Start(bb0[1]))}\\
+                     \InRust{var_defined(x, Mid(bb0[0]))}\\
+                     \InRust{cfg_edge(Start(bb0[0]), Mid(bb0[0]))}\\
+                     \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
+                   \end{tabular} &%
+                                   (nothing)
+                 \end{tabular}\\
+    \end{tabular}    
+  }
+
+\caption[Rules For Deriving Drop-Liveness]{The rules for calculating
+  drop-liveness: the rules are similar to those for to use-liveness
+  (Figure~\ref{fig:var-use-live}), but propagation of liveness only happens if
+  the variable being dropped may be initialised. Note that the rule for
+  calculating initialisation on entry is not transitive!}\label{fig:var-drop-live}
+\end{figure}
+
 \subsection{Variable Liveness to Provenance Variable Liveness}\label{sec:region-live-at}
 
 The two kinds of liveness are then used to calculate the reference liveness
@@ -1677,10 +1726,8 @@ provenance variable(s) is \textit{indirect}; any reference stored inside the
 drop-live \InRust{struct} in~$v$ is live at~$p$ if~$v$ is drop-live there. An
 example of this can be seen in Table~\ref{tab:liveness-example}.
 
+\begin{figure}
 \begin{sourcecode}
-  \captionof{listing}{A provenance variable is live if it either belongs to a
-    use-live variable, or if it might be dereferenced during the deallocation of
-    a drop-live variable.}\label{lst:region-live-at}
 \begin{minted}{prolog}
 region_live_at(R, P) :-
     var_drop_live(V, P),
@@ -1691,6 +1738,31 @@ region_live_at(R, P) :-
         var_uses_region(V, R).
 \end{minted}
 \end{sourcecode}
+
+{ \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{@{}l l}
+      Positive & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{var_drop_live(x, Mid(bb0[1]))}\\
+                     \InRust{var_drops_region(x, 'nested)}
+                   \end{tabular} &%
+                                   \InRust{region_live_at('nested, Mid(bb0[1])}\\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{var_use_live(x, Mid(bb0[1]))}\\
+                     \InRust{var_uses_region(x, 'x)}
+                   \end{tabular} &%
+                                   \InRust{region_live_at('x, Mid(bb0[1])}\\
+                 \end{tabular}\\
+    \end{tabular}    
+  }
+
+\caption[Rules for Deriving Live Provenance Variables]{A provenance variable is
+  live if it either belongs to a use-live variable, or if it might be
+  dereferenced during the deallocation of a drop-live
+  variable.}\label{fig:region-live-at}
+\end{figure}
+
 
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
@@ -1704,7 +1776,8 @@ region_live_at(R, P) :-
 \end{tabular}
 \caption[Liveness Example]{An example of a drop-live \InRust{struct} causing an
   inner provenance variable to be live. This program would generate an error, as
-  we have two overlapping loans of the same path, where one is mutable.}
+  we have two overlapping loans of the same path (\InRust{x}), where one is
+  mutable.}
   \label{tab:liveness-example}
 \end{table}%
  }
@@ -1801,8 +1874,7 @@ moved_out_at(Child, P) :-
 \end{minted}
 \end{sourcecode}
 
-\subsection{Over-Estimating Initialisation for Later
-  Use}\label{sec:var-maybe-initialised}
+\subsection{Over-Estimating Initialisation for Liveness}\label{sec:var-maybe-initialised}
 
 We begin initialisation tracking on assignments. A path is trivially initialised
 in a statement where it is initialised (\InRust{x.f = 17}), and stays
@@ -1823,13 +1895,8 @@ no-op if the entire variable was provably moved.~\footnote{However, partial
   during deallocation, as discussed in Section~\ref{sec:move-errors}.} The full
 listing for the code can be found in Listing~\ref{lst:var-initialised}.
 
+\begin{figure}
 \begin{sourcecode}
-  \captionof{listing}{The rules for over-approximating variable initialisation.
-    A path is trivially initialised where it is actually initialised. It is
-    transitively initialised in all points reachable from a point where it is
-    initialised, and where it has not been deinitialised (moved out). Variables
-    are initialised if their root path is
-    initialised.}\label{lst:var-initialised}
 \begin{minted}{prolog}
 path_maybe_initialized_on_exit(Path, Point) :- 
     initialized_at(Path, Point).
@@ -1844,6 +1911,43 @@ var_maybe_initialized_on_exit(Var, P) :-
     path_maybe_initialized_at(Path, P).
 \end{minted}
 \end{sourcecode}
+
+{ \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{@{}l l}
+      Positive & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{initialized_at(x, Mid(bb0[0]))}\\
+                     \InRust{cfg_edge(Mid(bb0[0]), Start(bb0[1]))}\\
+                     \InRust{path_belongs_to_var(x, x)}\\
+                   \end{tabular} &%
+                                   
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{var_maybe_initialized_on_exit(x, Mid(bb0[0]))} \\
+                     \InRust{var_maybe_initialized_on_exit(x, Start(bb0[1]))}
+                   \end{tabular}
+                       
+                 \end{tabular}\\
+      Negative & \begin{tabular}[t]{@{}l  l@{}}
+                   Input & Conclusion \\ \hline
+                   \begin{tabular}[t]{@{}l}
+                     \InRust{path_maybe_initialized_on_exit(x, Start(bb0[0]))}\\
+                     \InRust{moved_out_at(x, Mid(bb0[0]))}\\
+                     \InRust{cfg_edge(Start(bb0[0]), Mid(bb0[0]))}\\
+                     \InRust{path_belongs_to_var(x, x)}\\
+                   \end{tabular} &%
+                                   \InRust{var_m_i_e(x, Start(bb0[0]))}
+                 \end{tabular}\\
+    \end{tabular}    
+  }
+
+\caption[Rules for Over-Approximating Variable Initialisation]{The rules for
+  over-approximating variable initialisation. A path is trivially initialised
+  where it is actually initialised. It is transitively initialised in all points
+  reachable from a point where it is initialised, and where it has not been
+  deinitialised (moved out). Variables are initialised if their root path is
+  initialised.}\label{fig:var-initialised}
+\end{figure}
 
 \subsection{Under-Estimating Initialisation for Move
   Errors}\label{sec:move-errors}
@@ -1905,7 +2009,9 @@ path_definitely_initialized_on_exit(Path, Point) :-
 \begin{sourcecode}
   \captionof{listing}{A \InDatalog{Path} may have been moved at a
     \InDatalog{Point} if it was moved on the way there without being
-    subsequently reinitialised.}\label{lst:path-maybe-moved}
+    subsequently reinitialised. This logic is identical to the one used for
+    over-approximating initialisation in
+    Figure~\ref{fig:var-initialised}.}\label{lst:path-maybe-moved}
 \begin{minted}{prolog}
 path_maybe_moved_on_exit(Path, Point) :- moved_out_at(Path, Point).
 
@@ -2120,7 +2226,7 @@ Finally, Polonius performs the flow-sensitive propagation of these membership
 constraints across edges in the CFG. This is done using the rule in
 Listing~\ref{lst:requires-edge}, where the requirements propagate across
 CFG~edges for every loan~$L$ as long as the reference corresponding to~$L$ is
-not overwritten (\InDatalog{killed}), and only for provenance variables that are
+not overwritten (\InDatalog{killed(L, _)}), and only for provenance variables that are
 still live. This corresponds to the \textsc{T-Assignment} rule of Oxide, seen in
 Rule~\eqref{eq:t-assignment}.
 
@@ -2142,7 +2248,7 @@ requires(R, L, Q) :-
 
 The compiler produces a set of points in the CFG where a loan could possibly be
 violated (e.g. by producing a reference to a value that already has a unique
-reference) in \InDatalog{invalidates}. All that remains for Polonius is to
+reference) in \InDatalog{invalidates(P, L)}. All that remains for Polonius is to
 figure out which loans are live where (Listing~\ref{lst:loan-live}), and
 determine if any of those points intersect with an invalidation of that loan
 (Listing~\ref{lst:error-invalidates}).
@@ -2406,9 +2512,9 @@ implementation even when excluding smaller inputs~\ref{fig:solvetimes-long}.
 
 \begin{figure}
   \includegraphics[width=0.5\linewidth]{Graphs/var_drop_used_size_dist.pdf}
-  \caption[Distribution of Input Sizes for the \InDatalog{var_drop_used} Fact]{A
-    plot showing the distribution of \InDatalog{var_drop_used}.}
-  \label{fig:input-var-drop-used}
+  \caption[Distribution of Input Sizes for the \InDatalog{var_drop_used(V, P)}
+  Fact]{A plot showing the distribution of sizes of \InDatalog{var_drop_used(V,
+      P)}.}\label{fig:input-var-drop-used}
 \end{figure}
 
 A typical Polonius input consists of a small number of tuples for most
