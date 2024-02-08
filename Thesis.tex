@@ -143,6 +143,7 @@
 
 \usepackage{xparse}
 \usepackage{epigraph}
+\usepackage[normalem]{ulem}
 %
 \DeclarePairedDelimiterX{\Set}[1]{\{}{\}}{\setargs{#1}}
 \NewDocumentCommand{\setargs}{>{\SplitArgument{1}{;}}m}
@@ -152,6 +153,9 @@
 
 \newcommand{\ntyperule}[2]{\begin{array}{c}#1\\\hline\raisebox{1pt}{\strut}#2\end{array}}
 \newcommand{\Loan}[0]{l}
+
+\newcommand{\goodexample}[1]{\colorbox{green}{#1}}
+\newcommand{\badexample}[1]{\colorbox{red}{\sout{#1}}}
 
 % Relations
 \DeclareMathOperator{\Live}{Live}
@@ -516,7 +520,7 @@ use-after-frees. A mutable reference must not be (effectively) aliased.
 
 A summary of the rules enforced by the borrow check can be found in
 Table~\ref{tab:borrow-check}, along with positive and negative examples.
-\colorbox{green}{green} and \colorbox{red}{red} boxes illustrate where the
+\goodexample{green} and \badexample{red} boxes illustrate where the
 borrow check would occur with or without an error, respectively. Many of these
 examples are taken directly or slightly modified from
 \citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
@@ -531,12 +535,12 @@ examples are taken directly or slightly modified from
      let x: u32;
 
      if random() {
-         |\colorbox{green}{x =}| 17;
+         |\goodexample{x =}| 17;
      } else {
-         |\colorbox{green}{x =}| 18;
+         |\goodexample{x =}| 18;
      }
 
-     let y = |\colorbox{green}{x}| + 1;
+     let y = |\goodexample{x}| + 1;
     \end{minted}
   \end{minipage}&% Negative example:
   \begin{minipage}[t]{0.41\textwidth}
@@ -544,11 +548,11 @@ examples are taken directly or slightly modified from
      let x: u32;
 
      if random() {
-         |\colorbox{green}{x =}| 17;
+         |\goodexample{x =}| 17;
      }
 
      // ERROR: x not initialized:
-     let y = |\colorbox{red}{x}| + 1; 
+     let y = |\badexample{x}| + 1; 
     \end{minted}
   \end{minipage} \\
   Move-Deinit&% Positive example of move-deinit
@@ -556,20 +560,20 @@ examples are taken directly or slightly modified from
     \begin{minted}[escapeinside=||,autogobble]{rust}
     let tuple = (vec![1], vec![2]);
 
-    moves_argument(|\colorbox{green}{tuple.1}|);
+    moves_argument(|\goodexample{tuple.1}|);
 
     // Does not overlap tuple.1:
-    let x = |\colorbox{green}{tuple.0}|[0];
+    let x = |\goodexample{tuple.0}|[0];
 \end{minted}
 \end{minipage}&% Negative example of move-deinit
   \begin{minipage}[t]{0.41\textwidth}
     \begin{minted}[escapeinside=||, autogobble]{rust}
     let tuple = (vec![1], vec![2]);
 
-    moves_argument(|\colorbox{green}{tuple.0}|);
+    moves_argument(|\goodexample{tuple.0}|);
 
     // ERROR: use of moved value:
-    let x = |\colorbox{red}{tuple.0}|[0];
+    let x = |\badexample{tuple.0}|[0];
 \end{minted}
   \end{minipage}\\
   Shared-Readonly&% Positive example of shared-readonly
@@ -578,10 +582,10 @@ examples are taken directly or slightly modified from
 struct Point(u32, u32);
 let mut pt = Point(13, 17);
     
-let x = |\colorbox{green}{&pt}|;
-let y = |\colorbox{green}{&pt}|;
+let x = |\goodexample{&pt}|;
+let y = |\goodexample{&pt}|;
     
-dummy_use(|\colorbox{green}{x}|); dummy_use(|\colorbox{green}{y}|);
+dummy_use(|\goodexample{x}|); dummy_use(|\goodexample{y}|);
 \end{minted}
 \end{minipage}&% Negative example of shared-readonly
   \begin{minipage}[t]{0.41\textwidth}
@@ -589,11 +593,11 @@ dummy_use(|\colorbox{green}{x}|); dummy_use(|\colorbox{green}{y}|);
 struct Point(u32, u32);
 let mut pt = Point(13, 17);
     
-let x = |\colorbox{green}{&pt}|;
+let x = |\goodexample{&pt}|;
 // ERROR: assigned to
 //   borrowed value:
-|\colorbox{red}{pt.0 += 1}|;
-dummy_use(|\colorbox{green}{x}|);
+|\badexample{pt.0 += 1}|;
+dummy_use(|\goodexample{x}|);
 \end{minted}
   \end{minipage}\\
   Unique-Write&% Positive example of unique-write
@@ -602,11 +606,11 @@ dummy_use(|\colorbox{green}{x}|);
 struct Point(u32, u32);
 let mut pt = Point(13, 17);
     
-let x = |\colorbox{green}{&mut pt}|;
-let y = |\colorbox{green}{&mut pt}|;
+let x = |\goodexample{&mut pt}|;
+let y = |\goodexample{&mut pt}|;
 
 //dummy_use(x);
-dummy_use(|\colorbox{green}{y}|);
+dummy_use(|\goodexample{y}|);
 \end{minted}
 \end{minipage}&% Negative example of unique-write
   \begin{minipage}[t]{0.41\textwidth}
@@ -614,13 +618,13 @@ dummy_use(|\colorbox{green}{y}|);
 struct Point(u32, u32);
 let mut pt = Point(13, 17);
     
-let x = |\colorbox{red}{&mut pt}|;
+let x = |\badexample{&mut pt}|;
 // ERROR: cannot borrow `pt`
 // as mutable more than once:
-let y = |\colorbox{red}{&mut pt}|;
+let y = |\badexample{&mut pt}|;
 
-dummy_use(|\colorbox{red}{x}|);
-dummy_use(|\colorbox{green}{y}|);
+dummy_use(|\badexample{x}|);
+dummy_use(|\goodexample{y}|);
 \end{minted}
   \end{minipage}\\
   Ref-Live&% Positive example of ref-live
@@ -629,11 +633,11 @@ dummy_use(|\colorbox{green}{y}|);
 struct Point(u32, u32);
 let pt = Point(6, 9);
 let x = {
-    |\colorbox{green}{&pt}|
+    |\goodexample{&pt}|
 }; // pt still in scope
 
 
-let z = |\colorbox{green}{x.0}|;
+let z = |\goodexample{x.0}|;
 \end{minted}
 \end{minipage}&% Negative example of ref-live
   \begin{minipage}[t]{0.41\textwidth}
@@ -641,17 +645,17 @@ let z = |\colorbox{green}{x.0}|;
 struct Point(u32, u32);
 let x = {
     let pt = Point(6, 9);
-    |\colorbox{red}{&pt}|
+    |\badexample{&pt}|
 }; // pt goes out of scope
 
 // ERROR: pt does not live
 // long enough:
-let z = |\colorbox{red}{x.0}|; 
+let z = |\badexample{x.0}|; 
 \end{minted}
   \end{minipage}
 \end{tabular}
 \caption[The Rules of the Borrow Check]{The Rules of the borrow check, with
-  \colorbox{green}{positive} (free from errors) and \colorbox{red}{negative}
+  \goodexample{positive} (free from errors) and \badexample{negative}
   (with errors) examples. Highlighted code shows (parts of) expressions that
   would perform the borrow check, such as mutating, moving, or reading a
   variable. Green highlights show accepted uses and red ones show failed ones.}
