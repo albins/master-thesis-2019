@@ -392,7 +392,6 @@ Listing~\ref{lst:drop-liveness}.
     loan of \InRust{data}, but the loan in \InRust{OwnDrop} is effectively dead
     and thus can be violated.}\label{lst:drop-liveness}
 \begin{minted}{rust}
-#[derive(Debug)]
 struct OwnDrop<'a> {
     data: &'a u32,
 }
@@ -403,8 +402,7 @@ struct DefaultDrop<'a> {
 
 impl<'a> Drop for OwnDrop<'a> {
     fn drop(&mut self) {
-        // the drop() method does something to the data
-        println!("dropping, we had {:?}", self.data);
+        // might access self.data
     }
 }
 
@@ -416,15 +414,13 @@ fn main() {
     let b = DefaultDrop { data: &y };
     
     // let mutrefa = &mut x;
-    // Causes an error (if used): the loan of x must be respected...
+    // ERROR: the loan of x must be respected...
     
     // ...but the loan of y need not be!
     let mutref = &mut y;
     *mutref = 17;
-    println!("mutref {}", mutref);
     
     // all variables are implicitly dropped here
-    
 }
 \end{minted}
 \end{sourcecode}
