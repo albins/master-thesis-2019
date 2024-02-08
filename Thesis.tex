@@ -327,8 +327,8 @@ Polonius has already proven useful for generating inputs to prove the
 correctness of Rust programs~\cite{Astrauskas:2019:LRT:3366395.3360573}.
 
 In practice, Polonius' analysis encompasses a variable liveness analysis
-(Section~\ref{sec:var-livenes}), initialisation tracking
-(Section~\ref{sec:var-initalisation}), and may-reference analysis for validation
+(Section~\ref{sec:liveness}), initialisation tracking
+(Section~\ref{sec:move-analysis}), and may-reference analysis for validation
 of Rust's memory safety guarantees and alias control
 (Section~\ref{sec:loan-constr-prop}), used to statically enforce safe use of
 shared memory.
@@ -353,7 +353,7 @@ repositories found on Crates.io and GitHub
 Polonius to a baseline naive implementation, and produces statistics on which
 types of inputs to Polonius typically dominate, drawing some conclusions on
 common coding patterns, and uses these to suggest future improvements of
-Polonius (Section~\ref{sec:optimisations}).
+Polonius (Chapter~\ref{cha:conclusions}).
 
 For clarity, sections detailing components not developed as part of this thesis
 are marked with~(\notmine{}). They are nonetheless included
@@ -433,20 +433,24 @@ safety than, for example, C. This reasoning power comes at the cost of
 restricting certain desirable (and safe) programming patterns that cannot be
 efficiently reasoned about by a compiler. In order to soften the blow from this,
 there is a continuous interest in increasing the reasoning power of the borrow
-check, and thereby the expressive power of Rust as a language.
+check, and thereby the expressive power of Rust as a language. It is within this
+equation that Polonius fits.
 
 \section{Limitations Addressed By Polonius}\label{sec:limitations}
 
-Due to limitations in its formulation, the current borrow checker rejects code
-such as the one in Listing~\ref{lst:motivating-example}, as it is unable to
-prove that there are no two overlapping write references to the same location in
-memory (namely \InRust{buffer}). This limitation stems from a more constrained
-reasoning around program flow, which introduces imprecision into the analysis.
-Polonius is designed to address this imprecision by extending the reasoning
-power of the borrow check to be flow-sensitive, that is reason at the power of
-each individual program statement. For a slightly longer explanation of the
-differences between the current borrow checker and Polonius, see
-Section~\ref{sec:reference-provenance}.
+Due to limitations in its formulation, the current borrow checker, \textit{non-linear
+lifetimes} (NLL), rejects code such as the one in
+Listing~\ref{lst:motivating-example}, as it is unable to prove that there are no
+two overlapping write references to the same location in memory (namely
+\InRust{buffer}). This limitation stems from a more constrained reasoning around
+program flow, which introduces imprecision into the analysis. In general terms,
+the current borrow checker reasons about references and their referents (the
+memory they refer to) in terms of \textit{lifetimes}, interpreted as the lines
+of a program where a reference may be used. Polonius is designed to address this
+imprecision by extending the reasoning power of the borrow check to be
+flow-sensitive, that is reason at the power of each individual program
+statement. For a slightly longer explanation of the differences between the
+current borrow checker and Polonius, see Section~\ref{sec:reference-provenance}.
 
 \begin{sourcecode}
   \captionof{listing}[Motivating example for Polonius]{A motivating example for
@@ -472,7 +476,11 @@ fn parse<'buf>(_buffer: &'buf mut String) -> &'buf str {
 \end{sourcecode}
 
 The other reason for Polonius is to more clearly capture the semantics of the
-borrow check in a domain-specific language. \fixme{expand.}
+borrow check in a domain-specific language. Rust's aliasing rules are not,
+strictly speaking, formalised. This means that future versions of Rust may
+change parts of the analysis. Therefore, having a clear, logic-like
+representation of the current rules is an advantage, besides being potentially
+easier to test, debug, develop, and profile as they are implemented.
 
 \chapter{The Borrow Check: Enforcing Rust's Memory
   Model}\label{cha:borrowing-rules}
@@ -484,30 +492,35 @@ borrow check in a domain-specific language. \fixme{expand.}
 
 In this chapter we will delve deeper into the borrow check. The idea is for the
 reader to develop an intuition for what it means in practice before moving on to
-the more technical sections. We will also briefly explain how the formulation of
-the borrow check changes between the current implementation (non-linear
-lifetimes, or NLL) and Polonius (Section~\ref{sec:reference-provenance}). This
-section also introduces the finer points of Polonius, and is worth reading even
-if you are uninterested in the changes to the previous implementation.
+actually implementing it in Chapters~\ref{cha:borrow-check-compiler}
+and~\ref{cha:implementation}. We will also briefly explain how the formulation
+of the borrow check changes between NLL and Polonius
+(Section~\ref{sec:reference-provenance}). This section introduces the finer
+points of Polonius, and is worth reading even if you are uninterested in the
+difference between Polonius and NLL.
 
 Conceptually, the borrow check verifies that Rust's ownership rules of shared
-memory are respected. Memory is owned by the scope (typically a function, block,
-or data structure) that has allocated it, and will be deallocated upon leaving
-the scope of the owner. Memory can also dynamically change owners through a
-move. For example, the constructor of a data structure can capture its arguments
-and store them in the returned data structure, thus moving the memory without
-performing a reallocation. The borrow check verifies that each memory access is
-(definitely) owned (and initialised) at the point of the control-flow of each
-access. It also verifies that accesses to shared memory through loans respect
-the terms of that loan. A shared reference cannot be mutated, and must be
-guaranteed to be free from use-after-frees.
+memory are respected. As mentioned in the previous section, memory is owned by
+the scope that has allocated it, and will be deallocated automatically when the
+owning scope is no longer needed. All of this is determined statically. Memory
+can also change owners through a move. For example, the constructor of a data
+structure can capture its arguments and store them in the returned data
+structure, thus moving the memory without performing a reallocation. The borrow
+check verifies that each memory access is (definitely) owned (and initialised)
+at the point of the control-flow of each access. It also verifies that accesses
+to shared memory through loans respect the terms of that loan. A shared
+reference cannot be mutated, and must be guaranteed to be free from
+use-after-frees. A mutable reference must not be (effectively) aliased.
 
 A summary of the rules enforced by the borrow check can be found in
-Table~\ref{tab:borrow-check}. Many of these examples are taken directly or
-slightly modified from \citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
+Table~\ref{tab:borrow-check}, along with positive and negative examples.
+\colorbox{green}{green} and \colorbox{red}{red} boxes illustrate where the
+borrow check would occur with or without an error, respectively. Many of these
+examples are taken directly or slightly modified from
+\citeauthor*{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 
 { \renewcommand{\arraystretch}{2.0}
-\begin{table}[h]
+\begin{table}[!htbp]
 \begin{tabular}{p{0.18\textwidth} p{0.41\textwidth} p{0.41\textwidth}}
   Rule & Positive Example & Negative Example \\ \hline
   Use-Init & % Positive example:
@@ -636,85 +649,99 @@ let z = |\colorbox{red}{x.0}|;
   \end{minipage}
 \end{tabular}
 \caption[The Rules of the Borrow Check]{The Rules of the borrow check, with
-  positive (free from errors) and negative (with errors) examples. Highlighted
-  code shows (parts of) expressions that would perform the borrow check, such as
-  mutating, moving, or reading a variable. Green highlights show accepted uses
-  and red ones show failed ones.}
+  \colorbox{green}{positive} (free from errors) and \colorbox{red}{negative}
+  (with errors) examples. Highlighted code shows (parts of) expressions that
+  would perform the borrow check, such as mutating, moving, or reading a
+  variable. Green highlights show accepted uses and red ones show failed ones.}
   \label{tab:borrow-check}
 \end{table}%
 }
 
-% Actually go through the rules top-to-bottom
+The initialisation and ownership tracking rules (Use-Init and Move-Deinit)
+guarantee that only initialised and owned memory is accessed. These are the
+rules that guarantee safe memory use at all, as well as garbage collection-free
+automatic memory management. In essence, they hold up the core ownership model,
+along with the corresponding reference lifetime rule (Ref-Live), which ensures
+that the points of access to memory through a reference does not happen after
+the scope owning the memory is left. This, for example, forbids us to return
+references to stack values from a function frame, as that frame would have been
+popped when the function survives. Semantically, this would mean that the
+returned reference \textit{lives longer} (is accessible from at least the same
+scopes) than its referent, the value on the stack.
+
+The rules of reference validity, Shared-Readonly and Unique-Write, together
+guarantee freedom from data-races, as well as access to valid data. They imply
+that only read-only memory can be shared between different, potentially
+concurrent, parts of the program, and read-only memory cannot have any data
+races. If a program mutates memory, it must have a unique name for that memory
+that cannot be accessible from another part of the program. The same rules also
+catch operations that would render a reference invalid, such as the owner of the
+borrowed memory moving or otherwise destroying it during a loan.
 
 
-
-This memory ownership model and its associated type system comes from a long
-line of reserch into what is known as \textit{linear}, or sometimes
-\textit{affine} types~\cite{wadler1990linear}. A linear or affine type captures
-the concept that a given data structure is accessed precisely or at most once,
-respectively. In this sense, mutable memory is linear in Rust; this is precisely
-the concept that guarantees freedom from data races and many other memory bugs.
-In comparison with other recent languages using capability types like
-Pony~\cite{clebsch2015pony, Clebsch:2015:DCS:2824815.2824816} or
+This approach and its associated type system comes from a long line of research
+into what is known as \textit{linear}, or sometimes \textit{affine}
+types~\cite{wadler1990linear}. A linear or affine type captures the concept that
+a given data structure is accessed precisely or at most once, respectively. In
+this sense, mutable memory is affine in Rust (used at most once); this is
+precisely the concept that guarantees freedom from data races and many other
+memory bugs. In comparison with other recent languages using capability types
+like Pony~\cite{clebsch2015pony, Clebsch:2015:DCS:2824815.2824816} or
 Encore~\cite{castegren2018capability}, Rust's memory ownership is relatively
 unsophisticated. Specifically, while capabilities attach to reference types of a
 language much like the borrow check's lending information (more closely
 discussed in the following section), capabilities have a higher resolution on
-operations they can allow or deny. While a full review of similar type systems
-is far outside the scope of this thesis, it is worth mentioning that the design
-choices involve a trade-off between what can be reliably implemented and
-reliably understood by a Rust programmer and the expressive power of the type
-system.
+operations they can allow or deny.
 
-\section{Polonius: From Lifetimes to Provenance Variables}\label{sec:reference-provenance}
+\section{Polonius: From Lifetimes to Provenance
+  Variables}\label{sec:reference-provenance}
 
-% present lifetimes as well
-% this is where we cast borrow check into Polonius
+The current borrow checker, NLL, treats the type of a reference, for example
+\InRust{&'db Database}, as a pair of values: a \textit{(named) lifetime}
+(\InRust{'db}), and a type of the referent (\InRust{Database}). This type should
+be read as ``a \InRust{Database} that lives for at least \InRust{'db}''.
+Lifetimes are not always explicit and named like in the example; often they are
+inferred by the compiler. Rust allows functions to be generic with respect to a
+reference's lifetime. In essence, such a generic type means that the function
+takes a reference that must live for some duration, which must overlap the
+entire function body's life. Similar notations allows for example a vector to
+hold references, as long as whatever they are referring to lives for at least as
+long as the vector they are stored in does. This is what the angle brackets in
+the motivating example of Listing~\ref{lst:motivating-example} mean; the
+function \InRust{next()} takes a reference to a \InRust{String}, and, more
+importantly, guarantees that it will return something that lives for at least as
+long, which is \InRust{'buf}.
 
-% In addition to being context-sensitive, Rust's borrow checker is also
-% flow-sensitive (i.e. performs analysis for each program point), like the system
-% described by \citeauthor*{Hardekopf:2009:SFP:1480881.1480911}, and whose form is
-% very similar to the analysis performed in practice by
-% Polonius~\cite{Hardekopf:2009:SFP:1480881.1480911}.
+Lifetimes in NLL are \textit{sets of lines of code a value lives for}. Given
+this notation, a value is said to \textit{outlive} another if it lives for a
+larger number of lines. There is also a the named lifetime \InRust{'static},
+which corresponds to the entire program, and so outlives every other lifetime.
+An error in NLL is reported if there is a violation of a loan overlapping its
+lifetime. However, the lifetimes formulation cannot express certain safe patterns, such as
+the one in Listing~\ref{lst:motivating-example}, where the lifetime of the loan
+ends up encompassing the entire loop unnecessarily.
 
-% This reference to NLLs is unclear; probably just drop it.
-% {\sloppy
-% Since its release, the Rust compiler has been extended through proposal RFC~2094
-% to add support for so-called non-lexical lifetimes (NLLs), allowing the compiler
-% to calculate lifetimes of references based on the control-flow graph rather than
-% the lexical scopes of variables~\cite{noauthor_rfc_2019}. During the spring of
-% 2018, Nicholas Matsakis began experimenting with a new formulation of the borrow
-% checker, called Polonius, using rules written in
-% Datalog~\cite{matsakis_alias-based_2018}. The intention was to use Datalog to
-% allow for a more advanced, flow-sensitive analysis while also allowing for
-% better compile-time performance through the advances done centrally to the
-% fixpoint solving provided by the Datalog engine~\cite{datafrog}. Conceptually,
-% this reformulation also significantly alters the previous formulation of the
-% borrow check in terms of lifetimes, now centering it around the concept of the
-% loans giving rise to references.}
-
-
-As the lifetime of its value is a part of a reference variable's type, it can be
-referred to by name using the syntax \InRust{&'lifetime}. In the literature, the
-terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
-lifetime''~\nocite{noauthor_rfc_2019}, and ``reference
-provenance''~\cite{weiss_oxide:_2019} (provenance) are all employed. As the
-section heading suggests, we will use the last one of them as we believe it best
-captures the concept. Named provenances (such as \InRust{'lifetime} above) are
-referred to as ``provenance variables''. For historical reasons, the name
-``region'' sometimes occurs in Polonius' code as well. Moreover, during the work
-on this thesis, a fourth term, ``origin'', was chosen to replace the term
-``provenance variables'' used here. Additionally, a comprehensive re-naming of
-all the terms used is also underway at the time of writing.
-
-From a type system perspective, the provenance is part of the type of any
-reference and corresponds to the borrow expressions (reference constructions)
-that might have generated it in the Polonius formulation of the borrow check.
-For example, if a reference \InRust{r} has the type \InRust{&'a Point},
-\InRust{r} is only valid as long as the terms of the loans in \InRust{'a} are
-upheld. Take for example the annotated code of
-Listing~\ref{lst:multi-path-borrow}, where \InRust{p} would have the type
-\InRust{&'a i32} where \InRust{a} is the set $\Set{L_0, L_1}$.
+This is why Polonius turns the relation between lifetimes and loans on its head.
+Its interpretation is that what was previously called a lifetime will now be
+called a \textit{provenance} of the loan, and corresponds to the set of loans
+(calls to a reference constructor) that could have given rise to the reference.
+Named provenances, \textit{ne{\'e}} named lifetimes, (such as \InRust{'lifetime}
+above) are referred to as ``provenance variables''.~\footnote{In the literature,
+  the terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
+  lifetime''~\nocite{noauthor_rfc_2019}, and ``reference
+  provenance''~\cite{weiss_oxide:_2019} (provenance) are all employed. As the
+  section heading suggests, we will use the last one of them as we believe it
+  best captures the concept. However, during the work on this thesis, a fourth
+  term, ``origin'', was chosen to replace the term ``provenance variables'' used
+  here. Additionally, a comprehensive re-naming of all the terms used is also
+  underway at the time of writing, but was not sufficiently finished to be
+  included in this report. For similar historical reasons, the name ``region''
+  sometimes occurs in Polonius' code as well.} For example, if a reference
+\InRust{r} has the type \InRust{&'a Point}, \InRust{r} is only valid as long as
+the terms of the loans in \InRust{'a} are upheld. Take for example the annotated
+code of Listing~\ref{lst:multi-path-borrow}, where \InRust{p} would have the
+type \InRust{&'a i32} where \InRust{'a} is the set $\Set{\InRust{&x[0]},
+  \InRust{&x[1]}}$.
 
 \begin{sourcecode}
   \captionof{listing}{An example of a multi-path loan where the value in
@@ -749,7 +776,13 @@ implication that any of the loans in $r$ might be dereferenced at control-flow
 points reachable from $p$, and thus that the terms of the loans in $r$ must be
 respected at that point. The possibility of a future access is not limited to
 direct access of a variable and is further discussed in
-Section~\ref{sec:deall-as-spec}.
+Section~\ref{sec:deall-as-spec}. This leads us back to our motivating example of Listing~\ref
+{lst:motivating-example} again, where Polonius would conclude that
+\InRust{event} is being reassigned before use at the call to \InRust{parse()},
+meaning that there would be no two overlapping live write-loans to the buffer,
+and therefore no error. The details of how this deduction is done is what will
+take the rest of this report to describe.
+
 
 \section{Polonius as a Type System}\label{sec:type-system}
 
@@ -781,13 +814,18 @@ Before going into the complexities of Oxide, we will start with a simplified
 typing judgement in Rule~\eqref{eq:s-ref-baby}, which says that a reference type
 is a subtype of another reference type iff their provenance variables are a
 subset. These typing judgements are implied on assignments with the intuition
-that you can only assign a right-hand side to a left-hand-side if the
-right-hand-side can function as a (is a subtype of) the left-hand-side. Such
+(based on Liskov's Substitution Principle) that you can only assign a right-hand
+side to a left-hand-side if the right-hand-side can function as a (is a subtype
+of) the left-hand-side. This means in terms of provenances that a reference
+type~$\tau_1$ is a subtype of another reference type~$\tau_2$ if it has a weaker
+dependency on loans, that is does not depend on additional loans. Such
 judgements will in practice be the main source of constraints on provenance
 variables in Polonius (the \InDatalog{outlives(R1, R2, P)} fact described in
 Chapter~\ref{cha:borrow-check-compiler}). In other words, if type systems are
 not your cup of tea, you may skip the rest of this section and proceed with
-Section~\ref{sec:borrow-check-intuition}.
+Section~\ref{sec:borrow-check-intuition}. The only thing you need to remember is
+that assignments give rise to subset constraints that, as it were, ``infects''
+provenance variables with loans from other provenance variables.
 
 \decoline
 
@@ -804,8 +842,8 @@ as $\expression{x = 2}$, and the global ($\Sigma$) and type-variable
 environments ($\Delta$). The two latter will not be of particular interest here,
 but are mentioned because they appear in the rules. Finally, variables that do
 not implement the \InRust{Copy} trait will be denoted with $\text{noncopyable}$.
-This is particularly important for moves, as they typically would not happen if
-the object being moved could instead be cheaply copied to wherever it is being moved.
+This is particularly important for moves, as they would not happen if the object
+being moved could instead be copied, and two copies be maintained.
 
 
 Judgments on the form~$\Gamma \vdash_{\omega} \pi \: : \: \tau$ mean that ``in
@@ -826,7 +864,7 @@ right prerequisite says) is only valid if~$\pi$ is uniquely usable (that is, is
 not shared) (left prerequisite) in $\Gamma$. The typing itself removes $\pi$
 from the $\Gamma$, effectively barring it from future use as it has no type
 (conclusion). This corresponds to the initialisation tracking of
-Section~\ref{sec:var-initalisation}, as well as part of the invalidation logic
+Section~\ref{sec:move-analysis}, as well as part of the invalidation logic
 of Polonius.
 
 \begin{equation}\label{eq:t-move}
@@ -844,9 +882,9 @@ safe, and produce a reference of equal $\omega$~access to that variable of the
 type ``reference to a value of type,~$\tau$, with its provenance variable being
 the set containing only that loan, denoted $^{\omega}\pi$''. This corresponds to
 the input fact \InDatalog{borrow_region(R, L, P)}, described in
-Section~\ref{sec:input-facts}, and follows the intuition that if we create a
-reference, that reference is \emph{known} to point to whatever we borrowed to
-create the reference.
+Section~\ref{cha:borrow-check-compiler}, and follows the intuition that if we
+create a reference, that reference is \emph{known} to point to whatever we
+borrowed to create the reference.
 
 \begin{equation}\label{eq:t-borrow}
   \ntyperule{
@@ -984,7 +1022,8 @@ fact, which is the major source of constraints on loans.
   }
 \end{equation}
 
-\section{Intuition: Polonius is Just a Bunch of Transitive Closures}\label{sec:borrow-check-intuition}
+\section{Intuition: Polonius is Just a Bunch of Transitive
+  Closures}\label{sec:borrow-check-intuition}
 
 
 \begin{figure}[h!]
@@ -1000,11 +1039,53 @@ fact, which is the major source of constraints on loans.
 \end{figure}
 
 We now imagine this typing rule yielding these subtyping constraints for every
-assignment in the MIR we are verifying. Polonius only concerns itself with the
-attached provenance variables of the types, other parts of the compiler verifies
-the rest of the typing judgment. Equipped with this simpler rule, we now have
-enough understanding of the formal basis of Polonius to move forward with the
-actual implementation.
+assignment we are verifying. Polonius only concerns itself with the attached
+provenance variables of the types, other parts of the compiler verifies the rest
+of the type checking. Equipped with the simplified Rule~\eqref{eq:s-ref-baby},
+we can see that what would happen during type-checking is first a computation of
+sets of loans. Moving along with the program flow, we would add all loans from
+assignments until we couldn't find any more loans to add to any provenance
+variable; that is, we would have computed the \textit{transitive closure} of the
+set membership constraints. This computation is described in
+Section~\ref{sec:loan-constr-prop}.
+
+There is one more rule to the computation of loan/provenance set memberships
+that we have not gotten into yet. If we see a loan be overwritten, that
+loan should not be propagated, and is said to be \textit{killed}. This is the
+rule that says that removes \InRust{&x} from the provenance of \InRust{r}'s type
+upon assignment in cases like this:
+\begin{minted}{rust}
+let r = &x;
+r = &y;
+\end{minted}
+
+Now we know which loans belongs to which references. The rest of Polonius
+verification of loans is just this: an error is a violation of a \textit{live
+  loan}, that is a loan that might be used in the future. As it turns out,
+liveness is \textit{another} transitive closure computation, described in
+Section~\ref{sec:liveness}, and the list of potential violations is generated by
+the Rust compiler and given as input to Polonius, a process which is described
+in Chapter~\ref{cha:borrow-check-compiler}.
+
+Finally, we have the move errors, described in Use-Init and Move-Deinit. It
+turns out that their computation is \textit{also} a transitive closure; at any
+point in the program, the set of initialised variables~\footnote{We will use a
+  more precise terminology than variables when it becomes time, but we are not
+  there yet.} is the set of variables that have been initialised so far, minus
+the ones that have been moved. This calculation is described in
+Section~\ref{sec:move-analysis}.
+
+Overall, the process looks something like
+Figure~\ref{fig:polonius-high-level-overview}. First, we compute a set of
+initialised variables (it turns out to be needed for computing live provenance
+variables), then we compute the set of initialised regular variables, and use
+both to find out which provenances are live. We then compute which loans belong
+to which provenance at which point in the program flow, which we use together
+with the liveness information to determine which loans may actually be used and
+so must be valid. We now have enough understanding of the formal basis of
+Polonius to move forward with the actual implementation, starting with the
+interaction between Polonius and the Rust compiler in the following chapter.
+
 \chapter{The Borrow Check in the Rust Compiler}\label{cha:borrow-check-compiler}
 \epigraph{Get thee to a nunnery, go. Farewell.}%
 {Hamlet offering me career advice after my work on this thesis. \textit{Hamlet},
@@ -1259,8 +1340,8 @@ Chapter~\ref{cha:implementation}.
   Were nothing but to waste night, day, and time;\\
   Therefore, since brevity is the soul of wit,\\
   And tediousness the limbs and outward flourishes,\\
-  I will be brief. Your noble son is mad ...}{Polonius, probably on using
-  Datafrog, in \textit{Hamlet}, Act-II, Scene-II}
+  I will be brief. ...}{Polonius, illustrating the succinctness and clarity of
+  Datafrog compared to Datafrog, in \textit{Hamlet}, Act-II, Scene-II}
 
 In this chapter, we will discuss Datalog, the language we use to express
 Polonius, and its implementation Datafrog. Datalog is a derivative of the logic
@@ -1268,13 +1349,15 @@ programming language Prolog, with the desirable properties that any program
 terminates in polynomial time, and in some variants also with the power to
 express all polynomial-time computation~\cite{afrati_datalog_1995}. It describes
 fixpoint calculations over logical relations as predicates, described as fixed
-input \emph{facts}, computed \emph{relations}, or \emph{rules} describing how to
+input \emph{facts} about objects, called \emph{atoms} (upper-case names),
+computed \emph{relations} (lower-case names), or \emph{rules} describing how to
 populate the relations based on facts or other relations. For example, defining
 a fact describing that an individual is another individual's child might look
-like \InDatalog{child(mary, john).}, while computing the \InDatalog{ancestor}
-relation could then use the two rules, reflecting the fact that ancestry is
-respectively either direct parenthood or transitive parenthood:
-\begin{minted}{rust}
+like \InDatalog{child(Mary, John).}, while computing the
+\InDatalog{ancestor(Older, Younger)} relation could then use the two rules,
+reflecting the fact that ancestry is respectively either direct parenthood or
+transitive parenthood:
+\begin{minted}{prolog}
 ancestor(Mother, Daughter) :- child(Daughter, Mother).
 ancestor(Grandmother, Daughter) :- 
     child(Mother, Grandmother),
@@ -1294,7 +1377,7 @@ variable, but multiple relations. Only single-step joins on the first tuple
 element are possible, which means that more complex rules must be written with
 intermediary variables, and manual indices created whenever a relation must be
 joined on a variable which is not the first in the tuple. An example of the
-\InDatalog{ancestor} relation in Datafrog can be seen in
+\InDatalog{ancestor(Older, Younger)} relation in Datafrog can be seen in
 Listing~\ref{lst:datafrog:ancestor}.
 
 \begin{sourcecode}
@@ -1302,8 +1385,8 @@ Listing~\ref{lst:datafrog:ancestor}.
   Datafrog.]{\InDatalog{ancestor(X, Y)} in Datafrog. Note the \InRust{map()}
     invocation, which reverses the tuples of the input \InRust{Vec} to fit the
     reversed target order. This example is used in work-in-progress Polonius
-    code used to derive children of move paths, which is otherwise left outside
-    of the scope of this thesis.}\label{lst:datafrog:ancestor}
+    code used to derive children of move paths, discussed in
+    Section~\ref{sec:move-analysis}.}\label{lst:datafrog:ancestor}
 \begin{minted}{rust}
 let ancestor = iteration.variable::<(T::Path, T::Path)>("ancestor");
 
@@ -1343,10 +1426,10 @@ var_use_live_var.from_leapjoin(
 \end{sourcecode}
 
 Moving on with a more complex example, the Datafrog code for
-\InDatalog{var_use_live(V, P)} of Listing~\ref{lst:var-live} becomes the code in
-Listing~\ref{lst:datafrog:var-live}, and the corresponding join used for the
+\InDatalog{var_use_live(V, P)} of Figure~\ref{fig:var-use-live} becomes the code
+in Listing~\ref{lst:datafrog:var-live}, and the corresponding join used for the
 first half of \InDatalog{region_live_at(R, P)} of
-Listing~\ref{lst:region-live-at} can be seen in
+Figure~\ref{fig:region-live-at} can be seen in
 Listing~\ref{lst:datafrog:region-live-at}.
 
 \begin{sourcecode}
@@ -1375,7 +1458,7 @@ result of joining the two non-target arguments, a tuple of type \InRust{(Key,
   Val2, Val3)}, and returns a tuple of format \InRust{Key, Val1} to be inserted
 into the target variable.
 
-In the example of Listing~\label{lst:datafrog:region-live-at}, the target
+In the example of Listing~\ref{lst:datafrog:region-live-at}, the target
 variable~\InRust{region_live_at_var} is populated by joining the
 \InRust{Variable} \InRust{var_drop_live_var} to the \InRust{Relation}
 \InRust{var_drops_region_rel}. Here, the combination function ignores the
@@ -1405,17 +1488,23 @@ representing \InRust{var_defined_rel} and the reversed CFG.
 
 \section{Why Datalog?}\label{sec:why-datalog}
 
-Datalog has a long history of use for static analysis, with a notable recent
-example being the Souffl{\'e} system, which synthesises performant C++ code from
-the Datalog specifications to show promising performance for analysis of large
-programs comparable to hand-crafted implementations in
-C++~\cite{scholz_fast_2016}. This approach is similar to how Datafrog embeds a
-minimal solver as a Rust library. Souffl{\'e} in particular was an inspiration
-for Polonius, and with the current ongoing work on translating Souffl{\'e}-style
-Datalog into the more cumbersome Datafrog EDSL format Polonius can almost be
-said to converge into a specialised ``Souffl{\'e} for Rust''.\footnote{The
-  experimental code to synthesise Datafrog rules can be found on GitHub in the
-  separate repository \url{https://github.com/lqd/datapond}.}
+The most obvious reason why we chose Datalog for Polonius lies in the intuition
+developed in Section~\ref{sec:borrow-check-intuition}. If Polonius is a bunch of
+transitive closures computed on certain relations over the CFG, Datalog would be
+a natural fit.
+
+Additionally, Datalog has a long history of use for static analysis, with a
+notable recent example being the Souffl{\'e} system, which synthesises
+performant C++ code from the Datalog specifications to show promising
+performance for analysis of large programs comparable to hand-crafted
+implementations in C++~\cite{scholz_fast_2016}. This approach is similar to how
+Datafrog embeds a minimal solver as a Rust library. Souffl{\'e} in particular
+was an inspiration for Polonius, and with the current ongoing work on
+translating Souffl{\'e}-style Datalog into the more cumbersome Datafrog EDSL
+format Polonius can almost be said to converge into a specialised ``Souffl{\'e}
+for Rust''.\footnote{The experimental code to synthesise Datafrog rules can be
+  found on GitHub in the separate repository
+  \url{https://github.com/lqd/datapond}.}
 
 Another inspiration was the \textsc{Doop}
 framework~\cite{smaragdakis_using_2010}, developed by
@@ -1453,27 +1542,24 @@ compiler.
 {\textit{Hamlet}, Act-II, Scene-II}
 
 In this chapter, we will describe the current implementation of Polonius in
-Datalog (forgetting the horrors of Datafrog in Section~\ref{sec:datalog}). We
-will start by discussing how information (``facts'') extracted from the
-user-supplied program via the MIR (introduced in
-Section~\ref{sec:rust-specificts}) flows through the Polonius analysis to
-determine if and where the conditions of a loan are violated. We will then go
-into detail about the actual Datalog rules of Polonius in
-Section~\ref{sec:borr-check-datal}, discuss how the input facts are generated in
-the Rust compiler (Section~\ref{lst:polonius-fact-emission}), and finish up by
-discussing what is missing in Polonius in order to perform a full analysis
-(Section~\ref{sec:missing-features}).
+Datalog (forgetting the horrors of Datafrog in Chapter~\ref{cha:datalog}). We
+will start by discussing how Polonius computes liveness of provenance variables,
+one of the two main contributions of this thesis, in Section~\ref{sec:liveness},
+then move on to move analysis in Section~\ref{sec:move-analysis} before
+finishing with the loan violation computation in
+Section~\ref{sec:loan-constr-prop}\notmine{}.
 
 An overview of Polonius can be seen in Figure~\ref{fig:polonius-overview}:
 initialisation is calculated in order to calculate drop-liveness, which together
 with regular use-liveness is used to determine the actual liveness of variables.
-The liveness of variables is then used to determine the liveness of provenance
-variables in their types, and is used throughout the calculations. Subset
-relations between provenance variables are used to determine the set membership
-of loans, and those are then combined with the liveness information in order to
-determine which loans are live at which point of the program flow. Errors,
-finally, are generated whenever a potentially violating operation happens to a
-live loan (an observed tree falls in the woods, thus making a sound).
+The liveness of variables is then used to determine the liveness of the
+provenance variable in their types, and is used throughout the calculations.
+Subset relations between provenance variables are used to determine the set
+membership of loans, and those are then combined with the liveness information
+in order to determine which loans are live at which point of the program flow.
+Errors, finally, are generated whenever a potentially violating operation
+happens to a live loan (an observed tree falls in the woods, thus making a
+sound).
 
 \begin{figure}
   \includegraphics[width=0.9\linewidth]{Graphs/polonius-overview}
@@ -1485,6 +1571,15 @@ live loan (an observed tree falls in the woods, thus making a sound).
     match the convention used in the actual code.}
   \label{fig:polonius-overview}
 \end{figure}
+
+In all of these sections, we will introduce every non-trivial rule with a
+positive and negative example of use. By positive we mean an example that would
+generate more members to the closure being computed, and by negative, we mean
+mean an example that would not match. Each section will also start with a table
+of the facts and relations used in that section, both the target ones and
+intermediary relations introduced along the way.
+
+But first, we need to clarify a detail we have previously glossed over, namely:
 
 \section{What Is Being Borrowed and Moved?}\label{sec:paths}
 
@@ -1516,6 +1611,13 @@ let y = &mut pt.1;
 
 \section{Liveness, as Experienced by Polonius}\label{sec:liveness}
 
+Liveness of \emph{variables} is computed in order to determine the liveness of
+\emph{provenance variables}. Intuitively, a variable (provenance or regular
+alike) is live when it may be used at some later point in the program. We say
+that a provenance variable is \textit{use-live} if it is live on account of
+being used (e.g. dereferenced). This is important, because if a provenance
+variable is dead, violating its loans is not an issue.
+
 A summary of the facts, intermediate relations, and outputs of Polonius'
 liveness computations can be found in Table~\ref{tab:liveness-facts-recap}.
 
@@ -1546,23 +1648,25 @@ liveness computations can be found in Table~\ref{tab:liveness-facts-recap}.
   \caption[MIR Fragment with Inputs and Outputs of the Liveness Analysis]{A
     graph representation of the the variable liveness calculation results, with
     relevant Polonius facts as they occur (a droplet symbolising
-    \InDatalog{var_drop_used}, a wrench \InDatalog{var_used}, and a skull and
-    crossbones symbolising \InDatalog{var_defined}). Variables are named by
-    prefixing underscores, and edges annotated with the propagated live variable
-    and its liveness type(s) (\textbf{D}rop or \textbf{U}se).}
+    \InDatalog{var_drop_used(V, _)}, a wrench \InDatalog{var_used(V, _)}, and a
+    skull and crossbones symbolising \InDatalog{var_defined(V, _)}). Variables
+    are named by prefixing underscores, and edges annotated with the propagated
+    live variable and its liveness type(s) (\textbf{D}rop or \textbf{U}se). The
+    source code is one of the test cases for drop-liveness.}
   \label{fig:liveness-graph}
 \end{figure}
 
-The basic liveness of a variable (Listing~\ref{lst:var-live}) is computed
-similarly to variable initialisation, except with variable uses instead of
-initialisations, assignments instead of uses, and backwards across the CFG.
-Specifically, the rule is as follows: if a variable~$v$ is live in some
-point~$q$ and~$q$ is reachable from $p$ in the control-flow graph, then~$v$ is
-live in~$p$ too unless it was overwritten. Like initialisation, it is also
-imprecise with respect to branchings, as there is no way to know statically
-which branch is taken. We refer to this type of liveness as
-\textit{use-liveness}, owing to the fact that the liveness comes from variable
-use.
+The use-liveness of a variable (Figure~\ref{fig:var-use-live}) is computed as a
+transitive closure backwards across the CFG. A variable is use-live where it is
+being used, and stays use-live (backwards) until it is defined. Specifically,
+the rule is as follows: if a variable~$v$ is live in some point~$q$ and~$q$ is
+reachable from $p$ in the control-flow graph, then~$v$ is live in~$p$ too unless
+it was overwritten. Like every analysis in Polonius, it is imprecise with
+respect to branchings, as there is no way to know statically which branch is
+taken. That means that we over-approximate variable liveness: if only one branch
+uses a variable, it is live upstream of that branch. Perhaps the best
+illustration of this is a graph form, as seen in
+Figure~\ref{fig:liveness-graph}.
 
 \begin{figure}
 \begin{sourcecode}
@@ -1607,8 +1711,12 @@ var_use_live(V, P) :-
     use-liveness: a variable is use-live if it was used at a point $P$, or if it
     was live in $Q$, there is a transition $P\rightarrow{}Q$, and it was not
     defined (killed) in $P$.}\label{fig:var-use-live}
-
 \end{figure}
+
+However, recall that we are not interested in the liveness of \emph{variables};
+we care about the provenances in their types. And it turns out that there is
+another way in which a reference may be live, which is by being used during the
+deallocation of a data structure.
 
 \subsection{Deallocation As a Special Case of Variable Use}
 \label{sec:deall-as-spec}
@@ -1699,7 +1807,7 @@ exception that a moved variable is never dropped, as it is now owned (and
 therefore deallocated) by the context it was moved to. This is the reason for
 the computation of variables that might be initialised in
 Section~\ref{sec:move-analysis}. The rules can be found in
-Listing~\ref{lst:drop-live}.
+Figure~\ref{fig:var-drop-live}.
 
 Note the use of the first rule, which is not transitive, to shift the point of
 the initialisation from the input's mid-point index (which is where a
@@ -1769,7 +1877,7 @@ var_drop_live(V, P) :-
 \subsection{Variable Liveness to Provenance Variable Liveness}\label{sec:region-live-at}
 
 The two kinds of liveness are then used to calculate the reference liveness
-relation (Listing~\ref{lst:region-live-at}), which serves as input for the rest
+relation (Figure~\ref{fig:region-live-at}), which serves as input for the rest
 of the borrow checker. A given provenance variable~$R$ is live at some point~$p$
 if it is in the type of a use-live variable~$v$, or if it is associated to a
 drop-live variable. While the connection between use-live variables and their
@@ -1862,30 +1970,37 @@ region_live_at(R, P) :-
 \end{table}%
 }
 
-The idea behind the move analysis is a fairly straightforward transitive closure
-computation. Initialisation (\InDatalog{path_initialized_lub_exit}) propagates
-forwards from an assignment (\InDatalog{initialized_at}) across the CFG
-(\InDatalog{cfg_edge}) until the path is moved (\InDatalog{moved_out_at}). We
-also transitively follow the move path tree downwards on each event, so that a
-use of \InRust{x} would also use \InRust{x.f}, for example. This transitive
-expansion of facts happens in a pre-computation described in
-Section~\ref{sec:move:fixpoints}. Finally, we trace root paths (and therefore
-also their transitive children) back to their variables through
-\InDatalog{path_belongs_to_var}. A summary of the inputs, outputs, and
-intermediary relationships involved in the computation can be found in
-Table~\ref{tab:move-facts-recap}.
+The idea behind the move analysis is again a transitive closure computation
+across the CFG, much like the one for liveness in Section~\ref{sec:liveness}.
+Initialisation (\InDatalog{path_maybe_initialized_on_exit(P, _)}) propagates
+forwards from an assignment (\InDatalog{initialized_at(P, _)}) across the CFG
+(\InDatalog{cfg_edge(P, Q)}) until the path is moved (\InDatalog{moved_out_at(P,
+  _)}). We also transitively follow the move path tree downwards on each event,
+so that a use of \InRust{x} would also use \InRust{x.f}, for example. This
+transitive expansion of facts happens in a pre-computation described in
+Section~\ref{sec:move:fixpoints}, and is needed for erroneous path accesses to
+be guaranteed to overlap with a moved out path and generate an error. Finally,
+we trace root paths (and therefore also their transitive children) back to their
+variables through \InDatalog{path_belongs_to_var(P, V)} for use in drop-liveness
+computations. A summary of the inputs, outputs, and intermediary relationships
+involved in the computation can be found in Table~\ref{tab:move-facts-recap}.
+Additionally, an annotated example of Rust source code with relevant facts and
+conclusions can be found in Table~\ref{tab:move-example}.
 
-However, Rust programs like all Turing-complete programs, are not deterministic.
-Therefore initialisation tracking is necessarily imprecise upon branching; if
-one branch in the CFG has \InDatalog{Path} initialised and one does not, we must
-decide on whether to over-estimate (assume \InDatalog{Path} is initialised), or
-under-estimate (assume \InDatalog{Path} is deinitialised) after the branches
-join. As it turns out, the move analysis does both. When we want to determine if
-a variable might be involved in a deallocation for the purposes of later
-figuring out live references in Section~\ref{sec:deall-as-spec}, we
-over-estimate (Section~\ref{sec:var-maybe-initialised}). When we want to figure
-out if it is safe to access a variable or if we should generate a move error, we
+Like liveness, initialisation tracking is necessarily imprecise upon branching;
+if one branch in the CFG has \InDatalog{Path} initialised and one does not, we
+must decide on whether to over-estimate (assume \InDatalog{Path} is
+initialised), or under-estimate (assume \InDatalog{Path} is deinitialised) after
+the branches join. As it turns out, the move analysis in contrast to variable
+liveness does both. When we want to determine if a variable might be involved in
+a deallocation for the purposes of later figuring out live provenances in
+Section~\ref{sec:deall-as-spec}, we over-estimate
+(Section~\ref{sec:var-maybe-initialised}). When we want to figure out if it is
+safe to access a variable or if we should generate a move error, we
 under-estimate (Section~\ref{sec:move-errors}).
+
+However, before the liveness computations can begin, we need to elaborate a few
+inputs.
 
 \subsection{Figuring Out The Move Tree}\label{sec:move:fixpoints}
 
@@ -1893,15 +2008,16 @@ The analysis begins with a pre-computation step that expands the path-related
 facts so that an initialisation of a prefix also initialises its children,
 grandchildren, etc. The Datalog for this can be found in
 Listings~\ref{lst:ancestor} and~\ref{lst:transitive-moves}. The transitive
-expansion happens for all the path-related facts: \InDatalog{initialized_at},
-\InDatalog{accessed_at}, \InDatalog{moved_out_at}, and \InDatalog{child} (which
-becomes \InDatalog{ancestor}). The names are re-used in later steps to reflect
-the fact that we see this as a pre-computation step expanding compressed facts
-from Rust.
+expansion happens for all the path-related facts: \InDatalog{initialized_at(P,
+  _)}, \InDatalog{accessed_at(P, _)}, \InDatalog{moved_out_at(P, _)}, and
+\InDatalog{child(P1, P2)} (which becomes \InDatalog{ancestor(P2, P1)}). The
+names are re-used in later steps to reflect the fact that we see this as a
+pre-computation step expanding compressed facts from Rust. These are, as you may
+have guessed, also transitive closure computations.
 
 \begin{sourcecode}
   \captionof{listing}{Calculating the move path tree; a path is the
-    \InDatalog{ancestor} of all its children and their children
+    \InDatalog{ancestor(Older, Younger)} of all its children and their children
     transitively.}\label{lst:ancestor}
 \begin{minted}{prolog}
 ancestor(Mother, Daughter) :- child(Daughter, Mother).
@@ -1915,8 +2031,8 @@ ancestor(Grandmother, Daughter) :-
 \begin{sourcecode}
   \captionof{listing}{Calculating transitive moves: a move, initialisation, or
     an access to a prefix transitively moves, initialises, or accesses all of
-    the prefix' children. Identical rules for for \InDatalog{initialized_at} and
-    \InDatalog{accessed_at} have been omitted.}\label{lst:transitive-moves}
+    the prefix' children. Identical rules for for \InDatalog{initialized_at(P, _)} and
+    \InDatalog{accessed_at(P, _)} have been omitted.}\label{lst:transitive-moves}
 \begin{minted}{prolog}
 moved_out_at(Path, P) :- moved_out_at(Path, P).
 
@@ -1926,26 +2042,32 @@ moved_out_at(Child, P) :-
 \end{minted}
 \end{sourcecode}
 
+Equipped with these elaborations, we can proceed with both over-estimating
+liveness for drop-liveness calculations
+(Section~\ref{sec:var-maybe-initialised}) and under-estimating initialisation
+for error reporting (Section~\ref{sec:move-errors}).
+
 \subsection{Over-Estimating Initialisation for Liveness}\label{sec:var-maybe-initialised}
 
 We begin initialisation tracking on assignments. A path is trivially initialised
 in a statement where it is initialised (\InRust{x.f = 17}), and stays
 initialised in the subsequent program points unless it is moved out by a move
 expression (\InRust{move x.f}, or \InRust{move x}). The imprecision is
-introduced by the join to \InDatalog{cfg_edge}; it is enough for one connecting
-edge to \InDatalog{Q} to have \InRust{x.f} initialised for it to be initialised
-at \InDatalog{Q}.
+introduced by the join to \InDatalog{cfg_edge(P, Q)}; it is enough for one
+connecting edge to \InDatalog{Q} to have \InRust{x.f} initialised for it to be
+initialised at \InDatalog{Q}.
 
 Finally, we relate the initialisation of root paths back to their variables
-through \InDatalog{path_belongs_to_var}. This means that we only track variables
-that are moved at the root level (\InRust{move x}, as opposed to \InRust{move
-  x.f}), and (for this purpose) ignore partial deinitialisation. This is safe to
-do as this information is only used to determine whether a deallocation of a
-variable would actually happen, and a deallocation is only guaranteed to be a
-no-op if the entire variable was provably moved.~\footnote{However, partial
-  deallocation could still cause a move error when the variable is accessed
-  during deallocation, as discussed in Section~\ref{sec:move-errors}.} The full
-listing for the code can be found in Listing~\ref{lst:var-initialised}.
+through \InDatalog{path_belongs_to_var(P, V)}. This means that we only track
+variables that are moved at the root level (\InRust{move x}, as opposed to
+\InRust{move x.f}), and (for this purpose) ignore partial deinitialisation. This
+is safe to do as this information is only used to determine whether a
+deallocation of a variable would actually happen, and a deallocation is only
+guaranteed to be a no-op if the entire variable was provably
+moved.~\footnote{However, partial deallocation could still cause a move error
+  when the variable is accessed during deallocation, as discussed in
+  Section~\ref{sec:move-errors}.} The full listing for the code can be found in
+Figure~\ref{fig:var-initialised}.
 
 \begin{figure}
 \begin{sourcecode}
@@ -2103,7 +2225,6 @@ path_maybe_moved_on_exit(Path, Point2) :-
 
 
 \section{Loan Constraint Propagation\notmine{}}\label{sec:loan-constr-prop}
-
 { \renewcommand{\arraystretch}{1.0}
 \begin{table}[!htbp]
   \begin{tabular}{@{}l l m{5.5cm}}
@@ -2148,7 +2269,15 @@ path_maybe_moved_on_exit(Path, Point2) :-
   introduced by the \InRust{if}~statement leads to dual subset constraints.}
   \label{tab:borrowck-example}
 \end{table}%
- }
+}
+
+The heart of Polonius is the loan constraint propagation where we figure out
+which loans belong to which provenances through the subset constraints
+introduced by subtyping relationships (as discussed in
+Section~\ref{sec:type-system}). A summary of the facts and relations involved
+can be found in Table~\ref{tab:polonius-facts-recap}. Additionally, a Rust
+snippet annotated with relevant facts and conclusions can be found in
+Table~\ref{tab:borrowck-example}.
 
 The first relation used in Polonius is the \InDatalog{subset(R1, R2, P)}
 relation, which states that~$R_1 \subseteq R_2$ for two provenance
@@ -2156,10 +2285,10 @@ variables~$R_1, R_2$ at point~$p$ in the CFG, and correspond to the constraints
 generated during validation of expressions involving subtyping, as discussed in
 Section~\ref{sec:type-system}. Initially, these have to hold at the points where
 the constraints are generated by the Rust compiler, as seen by the input
-parameter~\InDatalog{outlives}. The brief one-liner in
+parameter~\InDatalog{outlives(R1, R2)}. The brief one-liner in
 Listing~\ref{lst:subset-outlives} captures this fact, providing a ``base case''
 for the computation. Additionally the mathematical fact that the subset relation
-is transitive is captured in Listing~\ref{lst:subset-transitive}.
+is transitive is captured in Figure~\ref{fig:subset-transitive}.
 
 \begin{sourcecode}
   \captionof{listing}{Subset relations hold at the point where they are
@@ -2202,7 +2331,7 @@ subset(R1, R3, P) :-
     expect).}\label{fig:subset-transitive}
 \end{figure}
 
-Finally, Polonius needs logic to carry these subset relations across program
+Finally, Polonius needs logic to trace these subset relations across program
 flow. However, as mentioned before, we are only interested in detecting
 violations of loans that are actually live. Therefore, subset relation should be
 propagated across an edge of the control-flow graph if and only if its
@@ -2210,8 +2339,8 @@ provenance variables are live, otherwise we are in a ``if a tree falls in the
 woods'' situation where the conditions of the loans can be safely violated as
 there is no live reference to be affected. Therefore, the rule for propagating
 the subset constraint across a CFG~edge $P \rightarrow Q$ becomes the
-formulation seen in Listing~\ref{lst:subset-propagation}, using the output of
-the liveness calculations described in Section~\ref{sec:var-livenes}.
+formulation seen in Figure~\ref{fig:subset-propagation}, using the output of
+the liveness calculations described in Section~\ref{sec:liveness}.
 
 \begin{figure}
 \begin{sourcecode}
@@ -2251,6 +2380,7 @@ subset(R1, R2, Q) :-
   \caption{Subset relations propagate across CFG~edges iff both of their
     provenance variables are live.}\label{fig:subset-propagation}
 \end{figure}
+
 These rules describe how provenance variables relate to each other. The other
 part of the logic describes which loans belong to which provenance variable. The
 trivial base case is shown in Listing~\ref{lst:requires-borrow}, which just says
@@ -2285,11 +2415,11 @@ requires(R2, L, P) :-
 
 Finally, Polonius performs the flow-sensitive propagation of these membership
 constraints across edges in the CFG. This is done using the rule in
-Listing~\ref{lst:requires-edge}, where the requirements propagate across
+Figure~\ref{fig:requires-edge}, where the requirements propagate across
 CFG~edges for every loan~$L$ as long as the reference corresponding to~$L$ is
 not overwritten (\InDatalog{killed(L, _)}), and only for provenance variables that are
 still live. This corresponds to the \textsc{T-Assignment} rule of Oxide, seen in
-Rule~\eqref{eq:t-assignment}.
+Rule~\eqref{eq:t-assignment}, as discussed in Section~\ref{sec:type-system}.
 
 \begin{figure}
 \begin{sourcecode}
@@ -2340,6 +2470,11 @@ requires(R, L, Q) :-
   overwritten.}\label{fig:requires-edge}
 \end{figure}
 
+With these relations figured out, we now know for each program point which
+provenance variable can contain which loan (and therefore which path each
+reference may have been borrowed from). All that is left is translating this
+information into errors.
+
 \subsubsection{Detecting Loan Violations}
 
 The compiler produces a set of points in the CFG where a loan could possibly be
@@ -2378,21 +2513,11 @@ in Polonius before it reaches parity with NLL, the current borrow checker.
 \subsection{Detecting Access to Deinitialised Paths}
 \label{sec:missing-features:move}
 
-The current Polonius implementation only uses move data to derive conditional
-initialisation of variables in order to determine if they would be deallocated.
-However, the full borrow check would also calculate paths that \emph{may have
-  been moved out} and emit errors on access, such as in this code:
-\begin{minted}{rust}
-let tuple: (Vec<u32>, Vec<u32>) = (vec![], vec![]);
-drop(tuple.0); // moved out of `tuple`
-println!("{:?}", tuple.0); // ERROR
-\end{minted}
-
-All the necessary input facts are already collected but the actual
-implementation and testing of the logic depends on a re-designed interface
-between the Rust compiler and Polonius, which would have required extensive
-interaction with the rest of the compiler team. However, the lion's part of the
-work is in place.
+Most of the work required to support the full move initialisation is described
+in Section~\ref{sec:move-errors}. However, this code is untested, not integrated
+into Polonius' error reporting, and lacks support for some edge cases. This
+feature also depends on the design of an interface for Polonius to report these
+errors back to Rust, and such an interface has not yet been agreed upon.
 
 \subsection{Illegal Subset Relations}
 \label{sec:missing-features:illegal-subset-relations}
@@ -2415,7 +2540,8 @@ general, as Polonius (currently) knows nothing about the relationship between
 these two provenance variables, and in fact, as \InRust{pick_one()} is
 polymorphic over these provenance variables, this must hold for \emph{any} pair
 of provenance variables \InRust{'x, 'y}, which it certainly does
-not~\cite{matsakis_polonius_2019-1}.
+not~\cite{matsakis_polonius_2019-1}. This feature also depends on the design of
+an extended interface for reporting errors from Polonius to the Rust compiler.
 
 \subsection{Analysis of Higher Kinds}
 \label{sec:missing-features:higher-kinds}
@@ -2476,6 +2602,50 @@ drop(y);
 \end{sourcecode}
 
 \section{Conclusion}\label{sec:implementation:conclusion}
+
+In this chapter we have seen how Polonius starts with an analysis of move paths
+and their initialisation status. The analysis proceeds across program flow and
+is simultaneously both over- and underapproximating. Initialisation information
+is then used together with variable liveness to determine if a provenance
+variable is live at any given point of the control flow. This information is
+then used together with the subset relationships created from subtyping
+relations discovered during type-checking to determine which loans may be live
+at which points of the program flow. Joining these two insights together then
+helps us figure out which loans are live at which program point, which allows us
+to determine if violating them is an error or not. An annotated version of the
+motivating example of Listing~\ref{lst:motivating-example} showing Polonius
+deductions can be found in Listing~\ref{lst:motivating-example-deductions}
+below.
+
+
+\begin{sourcecode}
+  \captionof{listing}[Polonius Deductions on the Motivating Example]{Polonius
+    deductions on the motivating
+    example. As almost every interesting transition happens inside of the
+    assignment, events happening at mid-point are written in comments after the
+    line, and events happening at the start of the point are written at before
+    the line.}\label{lst:motivating-example-deductions}
+\begin{minted}{rust}
+fn next<'buf>(buffer: &'buf mut String) -> &'buf str {
+    loop {
+
+        // Start-point: invalidates(bw0)
+        // Start-point: borrow_live_at = {}: no error!
+        let event = parse(buffer); 
+        // Mid-point: bw0 dies through assignment to event
+        // borrow_live_at(bw0)
+        if true { // borrow_live_at(bw0)
+            return event; // borrow_live_at(bw0)
+        }
+    }
+}
+
+fn parse<'buf>(_buffer: &'buf mut String) -> &'buf str {
+    unimplemented!()
+}
+\end{minted}
+\end{sourcecode}
+
 
 \chapter{A Field Study of Polonius Inputs}\label{sec:field-study-borrow}
 \epigraph{There are more things in heaven and earth, Horatio,\\
@@ -2538,15 +2708,15 @@ density, transitivity, and number of connected components of the control-flow
 graph.
 
 Three variants of Polonius were included in the study; a \textsc{Naive}
-implementation, which is the one described in
-Section~\ref{sec:borr-check-datal}, an optimised variant
-(\textsc{DatafrogOpt}~\notmine{}), and a variant that first executes a simpler
-analysis assuming lexical lifetimes and falls back to the full Polonius analysis
-only when that one produces an error (\textsc{Hybrid}). The intention is to have
-such a hybrid algorithm re-use the information gained by the simpler analysis to
-accelerate the more advanced analysis, but such functionality was not yet
-implemented at the time of the experiments. This mode also performs the full
-liveness and initialisation analysis twice, penalising it in the
+implementation, which is the one described in Chapter~\ref{cha:implementation}
+without the move error code of Section~\ref{sec:move-errors}, an optimised
+variant (\textsc{DatafrogOpt}~\notmine{}), and a variant that first executes a
+simpler analysis assuming lexical lifetimes and falls back to the full Polonius
+analysis only when that one produces an error (\textsc{Hybrid}). The intention
+is to have such a hybrid algorithm re-use the information gained by the simpler
+analysis to accelerate the more advanced analysis, but such functionality was
+not yet implemented at the time of the experiments. This mode also performs the
+full liveness and initialisation analysis twice, penalising it in the
 comparison.
 
 The box plots in Figures~\ref{fig:solvetimes},~\ref{fig:solvetimes-long},
@@ -2700,34 +2870,6 @@ and input sizes of any kind (Table~\ref{tab:correlations}).
   For in that sleep of death what dreams may come}%
 {\textit{Hamlet}, Act-III, Scene-I}
 
-Before Polonius can replace NLL as the Rust borrow checker, it would need
-considerable performance improvements in both its fact generation process as
-well as the solving itself. In its current condition, the fact generation code,
-in particular, performs multiple walks across the CFG, needlessly increasing
-runtime. Additionally, many of the inputs are computed unnecessarily, and, for
-example, the CFG could be compressed for some cases.
-
-Returning to the analysis of Section~\ref{sec:field-study-borrow}, we can see
-from the performance of even the current naive \textsc{Hybrid} implementation,
-which first performs a non-flow sensitive analysis and then falls back to the
-full Polonius analysis, outperforms both the optimised analysis alone and
-\textsc{Naive}. We can also see that inputs without any loans at all are common,
-and in those cases the analysis can typically terminate before performing any
-analysis at all. Finally, \textsc{Naive} could be improved in two ways. First,
-in the current implementation initialisation and liveness analysis is performed
-twice for purely architectural reasons. A better implementation would calculate
-them once and re-use the results. Second, the current analysis does not use the
-errors from the flow-insensitive analysis when it falls back to the full
-flow-sensitive Polonius. Recycling the errors from the first analysis could in
-many cases reduce the search space for Polonius significantly, as any other
-error has already been ruled out in the simpler analysis.
-
-Finally, Datafrog itself could be optimised, including using faster vector
-instructions or parallelisation techniques. Additionally, several of the input
-relations used in Polonius are only used to exclude values, and never used to
-propagate them. This suggests it would be possible to use more compact data
-structures for representing them, such as Bloom filters.
-
 In this report, we have described a first implementation of the Rust borrow
 check in Datalog. We have shown how partial initialisation tracking was used
 along with variable-use and definition data to determine live references, which
@@ -2756,6 +2898,43 @@ investigation, and addressing it would likely impact the performance of
 Polonius, though possibly in a positive direction as a less precise formulation
 would potentially (in some cases) produce fewer tuples to propagate during
 analysis.
+
+Before Polonius can replace NLL as the Rust borrow checker, it would need
+considerable performance improvements in both its fact generation process as
+well as the solving itself. There have been no comprehensive benchmarking
+against NLL, but the test suite for Rust shows more than one instance where a
+test crashes with an out-of-memory error under Polonius, suggesting that
+significant engineering for certain corner cases, at a minimum, would be needed
+before Polonius is even usable.
+
+There are also several other sources of inefficiency in the fact generation
+code, which notably performs multiple walks across the CFG, needlessly
+increasing runtime. Additionally, many of the inputs are computed unnecessarily,
+and in many trivial cases the CFG could be compressed.
+
+Returning to the analysis of Section~\ref{sec:field-study-borrow} to inform our
+discussion on performance, we can see from the performance of even the current
+naive \textsc{Hybrid} implementation, which first performs a non-flow sensitive
+analysis and then falls back to the full Polonius analysis, outperforms both the
+optimised analysis alone and \textsc{Naive}. We can also see that inputs without
+any loans at all are common, and in those cases the analysis can typically
+terminate very early. Finally, \textsc{Naive} could be improved in two ways.
+First, in the current implementation initialisation and liveness analysis is
+performed twice for purely architectural reasons. A better implementation would
+calculate them once and re-use the results. Second, the current analysis does
+not use the errors from the flow-insensitive analysis when it falls back to the
+full flow-sensitive Polonius. Recycling the errors from the first analysis and
+using them as a starting point for Polonius could in many cases reduce the
+search space for Polonius significantly, as any other error has already been
+ruled out in the simpler analysis.
+
+Regarding the supporting infrastructure, Datafrog itself could be optimised,
+including using faster vector instructions or parallelisation techniques.
+Additionally, several of the input relations used in Polonius are only used to
+exclude values, and never used to propagate them. This suggests it would be
+possible to use more compact data structures for representing them, such as
+Bloom filters.
+
 
 \begin{figure}
   \includegraphics[width=\linewidth]{Graphs/polonius-refactor}
