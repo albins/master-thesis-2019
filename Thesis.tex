@@ -247,13 +247,12 @@ system Oxide in Section~\ref{sec:type-system}.
 
 However, these rules represent a trade-off between static provability and
 expressive power. There exist several desirable Rust patterns, suh as the
-example in Listing~\ref{lst:motivating-example}, that cannot be verified safe by
-the current borrow checker, despite being safe. This report describes a partial
-implementation of an experimental borrow checker called Polonius, which
-increases the reasoning power of the borrow check to reason at the level of
-individual program statements (a flow-sensitive analysis), allowing it to accept
-previously rejected coding patterns like the one in
-Listing~\ref{lst:motivating-example}.
+example in Listing~\ref{lst:motivating-example}, that cannot be proven safe by
+the current borrow checker. This report describes a partial implementation of an
+experimental borrow checker called Polonius, which increases the reasoning power
+of the borrow check to the level of individual program statements (a
+flow-sensitive analysis), allowing it to accept previously rejected coding
+patterns like the one in Listing~\ref{lst:motivating-example}.
 
 In practice, Polonius' analysis encompasses a variable liveness analysis
 (Section~\ref{sec:var-livenes}), initialisation tracking
@@ -266,20 +265,20 @@ shared memory.
 
 The contributions made in this thesis specifically include the implementation of
 liveness and initialisation calculations (Sections~\ref{sec:liveness}
-and~\ref{sec:move-analysis} respectively) in Polonius, previously computed in
-before invoking Polonius. Additionally, this report analyses real-world Rust
-code found in ca 12~000 popular publicly available Git repositories found on
-Crates.io and GitHub (Chapter~\ref{sec:field-study-borrow}). It compares two
-optimised variants of Polonius to a baseline naive implementation, and produces
-statistics on which types of inputs to Polonius typically dominate, drawing some
+and~\ref{sec:move-analysis} respectively) in Polonius, previously computed in an
+earlier compiler pass. Additionally, this report analyses real-world Rust code
+in ca 12~000 popular publicly available Git repositories found on Crates.io and
+GitHub (Chapter~\ref{sec:field-study-borrow}). It compares two optimised
+variants of Polonius to a baseline naive implementation, and produces statistics
+on which types of inputs to Polonius typically dominate, drawing some
 conclusions on common coding patterns, and uses these to suggest future
 improvements of Polonius (Section~\ref{sec:optimisations}).
 
 For clarity, sections detailing components not developed as part of this thesis
-are marked with~(\notmine{}). They are nonetheless included, as there has not
-previously been any published complete description of Polonius. In other words,
-this thesis is by far the most complete account of Polonius design,
-implementation, and operation.
+are marked with~(\notmine{}). They are nonetheless included
+(Section~\ref{sec:loan-constr-prop}), as there exists no published complete
+description of Polonius. In other words, this thesis is by far the most complete
+account of Polonius design, implementation, and operation.
 
 \chapter{A Safe and Modern Systems Programming Language}\label{cha:background}
 % Whenever a reference to a resource is created in Rust, its borrowing rules
