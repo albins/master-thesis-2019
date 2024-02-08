@@ -312,7 +312,7 @@ uninitialised memory, and that any shared memory is only shared immutably.
 Finally, it also protects against dangling references and references to
 stack-allocated memory that may be outside of the scope of an accessor. The
 rules of the memory ownership model are discussed at a higher level in
-Section~\ref{sec:borrowing-rules}, and related to the experimental formal type
+Chapter~\ref{cha:borrowing-rules}, and related to the experimental formal type
 system Oxide in Section~\ref{sec:type-system}.
 
 However, these rules represent a trade-off between static provability and
@@ -365,43 +365,75 @@ account of Polonius design, implementation, and operation to date.
 \epigraph{Be wary, then. Best safety lies in fear.}%
 {Laertes, on strong type systems. \textit{Hamlet}, Act-I, Scene-III.}
 
-% Whenever a reference to a resource is created in Rust, its borrowing rules
-% described in Section~\ref{sec:borrowing-rules} must be respected for as long as
-% the reference is alive, including across function
-% calls~\cite{nichols_rust_nodate}. In order to enforce these rules, the Rust
-% language treats the scope of a reference, conventionally called its lifetime, as
-% part of its type, and also provides facilities for the programmer to name and
-% reason about them as they would any other type.
+Rust is a \textit{systems programming language}, by which we mean that it is
+suitable for writing programs that require \textit{little overhead}, or precise
+control over \textit{hardware} or \textit{memory allocation}. It is useful for
+tasks like developing embedded systems, video games, or components for operating
+systems. Its design was driven by the needs of the next-generation rendering
+engine for Mozilla's browser Firefox, Servo~\cite{anderson2016engineering},
+where it replaces C++. Other notable uses of Rust for systems programming is in
+the research operating system Redox~OS~\cite{redox}.
 
+Rust is \textit{modern} in that it has an advanced type system, as well as
+support for functional programming paradigms (higher-order functions, lambda
+expressions, closures, pattern matching). It also comes with the build tool and
+dependency manager cargo, which greatly improves the experience over using tools
+like automake, cmake, etc, in particular with respect to dependency management.
+Additionally, it also supports object-oriented like programming styles (without
+inheritance) through traits~\cite{scharli2003traits}, a concept similar to
+Java's interfaces, combined with C-like \InRust{struct}s.
 
+Finally, we claim that Rust is \textit{safe} in that its memory ownership model
+guarantees that a reference will always point to \textit{initialised},
+\textit{valid} memory of the \textit{correct type}, and that \textit{references
+  do not introduce data races}. In particular the data-race freedom is important
+for concurrent applications such as the Servo rendering engine. The memory
+ownership model also supports systems programming by making it possible for the
+Rust compiler to automatically manage memory without using a garbage collector.
+This is what enables applications like operating system kernels to be written in
+Rust.
 
-% This reference to NLLs is unclear; probably just drop it.
-% {\sloppy
-% Since its release, the Rust compiler has been extended through proposal RFC~2094
-% to add support for so-called non-lexical lifetimes (NLLs), allowing the compiler
-% to calculate lifetimes of references based on the control-flow graph rather than
-% the lexical scopes of variables~\cite{noauthor_rfc_2019}. During the spring of
-% 2018, Nicholas Matsakis began experimenting with a new formulation of the borrow
-% checker, called Polonius, using rules written in
-% Datalog~\cite{matsakis_alias-based_2018}. The intention was to use Datalog to
-% allow for a more advanced, flow-sensitive analysis while also allowing for
-% better compile-time performance through the advances done centrally to the
-% fixpoint solving provided by the Datalog engine~\cite{datafrog}. Conceptually,
-% this reformulation also significantly alters the previous formulation of the
-% borrow check in terms of lifetimes, now centering it around the concept of the
-% loans giving rise to references.}
+Put simply, Rust tracks which scope \textit{owns} allocated memory, and when
+that scope is no longer accessible, its memory is deallocated. This is similar
+to what a disciplined C~programmer might do manually. Ownership over memory can
+be transferred through an operation called a \textit{move}, after which the
+memory is no longer accessible in the current scope, as it is now uniquely owned
+by the scope that took ownership over it. For example, the statement
+\InRust{vector.push(a)} would normally mean that the variable \InRust{a} is no
+longer accessible outside of the vector, as long as \InRust{a} does not
+implement the \InRust{Copy} trait, signalling that it should instead be copied
+into \InRust{vector}. Simple types that can be cheaply copied, such as integers,
+typically implement \InRust{Copy}.
 
+Keeping with the terminology, creating a reference is known as a \textit{loan}
+or a \textit{borrow} in Rust parlance. Whenever a reference to a resource is
+created in Rust, its borrowing rules described in
+Chapter~\ref{cha:borrowing-rules} must be respected for as long as the reference
+is alive, including across function calls~\cite{nichols_rust_nodate}. These
+rules include memory lifetimes (i.e. the referenced memory must stay initialised
+as long as there is a reference to it), and unique access for a write-reference;
+if there is an active write-reference to some part of memory, no other read- or
+-write references must exist simultaneously. This is the restriction that
+guarantees freedom from data races.
 
-\fixme{Rust uses traits~\cite{scharli2003traits}.}
+As a whole, the rules governing memory ownership in Rust are verified by a
+process called the \textit{borrow check}, and it is discussed in further detail
+in the following Chapter~\ref{cha:borrowing-rules}. As part of the verification
+system, additional information about the origin of a reference is embedded in
+any reference' type. The details of this concept are introduced in
+Sections~\ref{sec:reference-provenance} and (much) further discussed in
+Section~\ref{sec:type-system}.
 
-% quickly introduce borrow check, forward-refer
-
-Rust's memory safety guarantees are part of its type system (as further
-discussed in Section~\ref{sec:type-system}), but is verified in a separate step
-of the compilation process (see Chapter~\ref{fixme}), called the \textit{borrow
-  check}. Unsurprisingly, the part of the compiler that performs it is fittingly
-called the \textit{borrow checker}. The specific rules enforced by the borrow
-checker are discussed in the next chapter (Chapter~\ref{cha:borrowing-rules}).
+Before moving further, we want to point out that Rust represents a different
+trade-off between static reasoning power of the compiler and expressive power
+for the programmer than other popular systems programming languages. By
+disallowing certain patterns of code, such as simultaneously overlapping
+references to writable memory, Rust is able to make greater guarantees of
+safety than, for example, C. This reasoning power comes at the cost of
+restricting certain desirable (and safe) programming patterns that cannot be
+efficiently reasoned about by a compiler. In order to soften the blow from this,
+there is a continuous interest in increasing the reasoning power of the borrow
+check, and thereby the expressive power of Rust as a language.
 
 \section{Limitations Addressed By Polonius}\label{sec:limitations}
 
@@ -644,6 +676,22 @@ system.
 % described by \citeauthor*{Hardekopf:2009:SFP:1480881.1480911}, and whose form is
 % very similar to the analysis performed in practice by
 % Polonius~\cite{Hardekopf:2009:SFP:1480881.1480911}.
+
+% This reference to NLLs is unclear; probably just drop it.
+% {\sloppy
+% Since its release, the Rust compiler has been extended through proposal RFC~2094
+% to add support for so-called non-lexical lifetimes (NLLs), allowing the compiler
+% to calculate lifetimes of references based on the control-flow graph rather than
+% the lexical scopes of variables~\cite{noauthor_rfc_2019}. During the spring of
+% 2018, Nicholas Matsakis began experimenting with a new formulation of the borrow
+% checker, called Polonius, using rules written in
+% Datalog~\cite{matsakis_alias-based_2018}. The intention was to use Datalog to
+% allow for a more advanced, flow-sensitive analysis while also allowing for
+% better compile-time performance through the advances done centrally to the
+% fixpoint solving provided by the Datalog engine~\cite{datafrog}. Conceptually,
+% this reformulation also significantly alters the previous formulation of the
+% borrow check in terms of lifetimes, now centering it around the concept of the
+% loans giving rise to references.}
 
 
 As the lifetime of its value is a part of a reference variable's type, it can be
@@ -970,13 +1018,13 @@ actual implementation.
   \label{fig:rustc-overview}
 \end{figure}
 
-The logic of the borrow check as described in
-Section~\ref{sec:reference-provenance} is calculated at the level of an
-intermediate representation of Rust called the Mid-Level Intermediate
-Representation (MIR), corresponding to the basic blocks of program control flow.
-Rust is lowered to MIR after regular type checking and after a series of earlier
-transformations, as seen in Figure~\ref{fig:rustc-overview}. The Polonius
-analysis is executed at the function level, checking a function at a time. 
+The logic of the borrow check as described in Chapter~\ref{cha:borrowing-rules}
+is calculated at the level of an intermediate representation of Rust called the
+Mid-Level Intermediate Representation (MIR), corresponding to the basic blocks
+of program control flow. Rust is lowered to MIR after regular type checking and
+after a series of earlier transformations, as seen in
+Figure~\ref{fig:rustc-overview}. The Polonius analysis is executed at the
+function level, checking a function at a time.
 
 The input data to Polonius is generated in the Rust compiler by analysing this
 intermediate representation. This means that we can safely assume to be working
@@ -2096,7 +2144,8 @@ path_maybe_moved_on_exit(Path, Point2) :-
   the fourth statement, the set memberships would be \InRust{'p} $=
   \Set{\text{\InRust{&'1 x}}}$, \InRust{'q} $= \Set{\text{\InRust{&'3 y}}}$,
   \InRust{'r} $= \Set{\text{\InRust{&'4 x}, \InRust{&'5 y}}}$,
-  resulting in only one two errors.}
+  resulting in only one two errors.< Additionally, note that the imprecision
+  introduced by the \InRust{if}~statement leads to dual subset constraints.}
   \label{tab:borrowck-example}
 \end{table}%
  }
