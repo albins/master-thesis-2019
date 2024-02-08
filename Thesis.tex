@@ -368,9 +368,9 @@ to be working with simple variable-value assignment expressions, of the type
 \section{From Lifetimes to Provenance Variables}
 \label{sec:reference-provenance}
 
-As the lifetime of its value is a part of a variable's type, it can be referred
-to by name like any other type using the syntax \InRust{&'lifetime}. In the
-literature, the terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
+As the lifetime of its value is a part of a reference variable's type, it can be
+referred to by name like any other type using the syntax \InRust{&'lifetime}. In
+the literature, the terms ``region''~\cite{matsakis_alias-based_2018}, ``(named)
 lifetime''~\nocite{noauthor_rfc_2019}, and ``reference
 provenance''~\cite{weiss_oxide:_2019} (provenance) are all employed. As the
 section heading suggests, I will use the last one of them as I believe it best
@@ -405,42 +405,79 @@ formally the type of the right-hand side, \InRust{&'a i32}, must be a subtype of
 the left-hand side's type; \InRust{&'a i32 <: &'b i32}. In practice, this
 establishes that \InRust{'b} lives at most as long as \InRust{'a}, which means
 that the subtyping rules for regions establishes a set membership constraint
-between the regions, as seen in Rule~\ref{eq:subtype}.
+between the regions, as seen in Rule~\ref{eq:subtype} of
+Section~\ref{sec:type-system}, which gives a brief introduction to the reference
+ownership analysis of Polonius from a type system perspective.
+
+Finally, when talking about the \emph{liveness} of a provenance variable $r$ at
+some point in the control-flow graph $p$, we will mean that $r$ occurs in the
+type of at least one variable which is live at $p$. This has the semantic
+implication that any of the loans in $r$ might be dereferenced at control-flow
+points reachable from $p$, and thus that the terms of the loans in $r$ must be
+respected at that point. For a more formal explanation of this, including an
+expansion of how provenance variables are populated, please see the following
+section.
+
+\section{Reference Ownership as a Type System}\label{sec:type-system}
+
+Summing up the ongoing work of \citeauthor{weiss_oxide:_2019} on formalising the
+reference ownership rules of Rust~\cite{weiss_oxide:_2019}. At the heart of the
+type system lies the flow-sensitive typing judgement seen in Rule~\fixme{add fig
+  1 of Oxide here.}. \fixme{explain the rules here}.
+
+\fixme{describe the different $\omega$-derivations.}
+
+\fixme{describe the branching rules}
+
+\fixme{describe the sequencing rules}
+
+\fixme{describe type unification}
+
+\fixme{describe assignment rules}
 
 \begin{equation}\label{eq:subtype}
 \ntyperule{a \subseteq b}{\InRust{&'a u32} <: \InRust{&'b u32}}
 \end{equation}
 
-\fixme{How to incorporate the fact that this is with respect to the current point?}
 
-Finally, when talking about the \emph{liveness} of a provenance variable $r$, we
-will mean that $r$ occurs (\fixme{what does occurs mean? Does it encompass
-  exploded subset-types etc?}) in the type of at least one live variable at some
-point in the control-flow graph $p$. This has the semantic implication that any
-of the loans in $r$ might be dereferenced at control-flow points reachable from
-$p$, and thus that the terms of the loans in $r$ must be respected at that
-point.
+Under these rules, a Rust function is valid from the perspective of the borrow
+check if, for each point in the control flow graph, the borrow rules are
+respected. That means, for each point $p$, with environment $\Gamma_p$:
+
+\begin{itemize}
+\item moving or unique-borrowing a place $\pi$ implies that for all every loan
+  $l$ of $\pi$ in $\Gamma_p l \:\text{Killed}\: p$.
+\item shared-borrowing a place $\pi$ creates a new loan $l$ which is in the
+  provenance variable of the LHS. \fixme{How do I show that this invalidates any
+  shared borrows of $\pi$???}.
+\item assigning to a place $\pi$:
+  \begin{itemize}
+  \item kills the loan associated with $\pi$ from $p$ and onward
+  \item enforces a subset relationship between LHS' region and RHS' region
+    \fixme{how does this interact with overwriting?!}
+  \end{itemize}
+\end{itemize}
 
 
 \section{Deallocation As a Special Case of Variable Use}
 \label{sec:deall-as-spec}
 When Rust's variables go out of scope, they are implicitly deallocated, or
 dropped in Rust parlance. Explicit deallocation is also possible by calling the
-function \InRust{drop()}, which takes ownership of a variable and performs
-deallocation, or, for complex objects, calls the \InRust{drop()} method. For
-some types such as integers, deallocation is not necessary and the
-compiler generates no actual \InRust{drop()}:s in the MIR.
+function \InRust{drop()}, which takes ownership of a variable (that is,
+deinitialises it) and performs deallocation, or, for complex objects, calls the
+\InRust{drop()} method. For some types such as integers, deallocation is not
+necessary and the compiler generates no actual \InRust{drop()}:s in the MIR.
 
 Rust provides a default deallocator for data structures, but it can be
 overridden. This has repercussions on liveness calculations, because while the
-default deallocator for an object never needs to access its fields, a custom
-deallocator might access any of them. This means that any conditions of a loan
-that resulted in a reference $r$ stored in a \InRust{struct} $s$ instance $a$
-must only be respected as far as \InRust{a.drop()} is concerned if $s$
-implements a custom deallocator. Otherwise the loan of $r$ may be safely
-violated, as the default deallocator never dereferences $r$ and thus doesn't
-require $r$ to be valid. An illustration of this can be seen in
-Listing~\ref{lst:drop-liveness}.
+default deallocator for an object never needs to access its fields except to
+deallocate them, a custom deallocator might access any of them in arbitrary
+ways. This means that any conditions of a loan that resulted in a reference $r$
+stored in a \InRust{struct} $s$ instance $a$ must only be respected as far as
+\InRust{a.drop()} is concerned if $s$ implements a custom deallocator. Otherwise
+the loan of $r$ may be safely violated, as the default deallocator never
+dereferences $r$ and thus doesn't require $r$ to be valid. An illustration of
+this can be seen in Listing~\ref{lst:drop-liveness}.
 
 \begin{sourcecode}
   \captionof{listing}{The custom deallocator for \InRust{OwnDrop} enforces the
@@ -547,11 +584,37 @@ region_live_at_var.from_join(
 \end{minted}
 \end{sourcecode}
 
+Joins in Datafrog are done using one of two methods on the variable that is to
+be populated (e.g. in Listing~\ref{lst:datafrog:region-live-at}
+\InRust{region_live_at_var}), a variable with tuples of the format \InRust{(Key,
+  Val1)}. The first method, \InRust{from_join}, performs simple joins from
+variables or relations into the (possibly different) target variable. Its
+arguments, in order, are a \InRust{Variable} of type \InRust{(Key, Val2)}, and
+either a second \InRust{Variable} or a \InRust{Relation} of type \InRust{(Key,
+  Val3)}. The third and final argument is a combination function that takes each
+result of joining the two non-target arguments, a tuple of type \InRust{(Key,
+  Val2, Val3)}, and returns a tuple of format \InRust{Key, Val1} to be inserted
+into the target variable.
 
-\chapter{A Datalog Model for the Rust Borrow Checker}
+For more complex joins where a single variable participates in the join and all
+other arguments are static \InRust{Relation}s (such as is the case with the
+variable \InRust{var_live_var} of Listing~\ref{lst:datafrog:var-live}), there is
+\InRust{from_leapjoin}. In this case, the input is the sole dynamic source
+variable, a tuple of ``leapers'', and a combining function like the one in
+\InRust{from_join}, but with the signature like the one above, mapping a matched
+tuple from the join to the target of the join.
+
+A leaper is created from a \InRust{Relation} of type \InRust{(Key, Value)} by
+either applying the method \InRust{extend_with} or \InRust{extend_anti} for a
+join or an anti-join respectively. Both of these functions then take a function
+mapping tuples from the \InRust{Variable} to \InRust{Key}s in the
+\InRust{Relation} being (anti-)joined. In the case of \InRust{extend_anti}, any
+tuples matching \InRust{Key} are discarded.
+
+
+\chapter{A Declarative Model for the Rust Borrow Checker}
 \label{cha:investigation}
 % \epigraph{\fixme{short quote}}
-
 
 \section{The Borrow Checker in Datalog}
 
@@ -580,7 +643,7 @@ The following short-hand names are used:
 \item[\InDatalog{cfg_edge(P, Q)}] whenever there is a relation $P \rightarrow Q$
   in the control flow graph.
     
-\item[\InDatalog{killed(L ,P)}] when some prefix of the path (\fixme{explain
+\item[\InDatalog{killed(L, P)}] when some prefix of the path (\fixme{explain
     prefixes and paths}) borrowed in $L$ is assigned at point~$P$.
     
 \item[\InDatalog{outlives(R1, R2, P)}] when $R_1 \subseteq R_2$ must hold at
@@ -673,9 +736,31 @@ region_live_at(R, P) :-
 
 \subsection{Illegal Subset Relations\notmine{}}
 
-\section{A Field Study of Borrow Patterns}\label{sec:field-study-borrow}
+\section{A Field Study of Polonius Input Data}\label{sec:field-study-borrow}
+
+I selected roughly 20 000~publicly available Rust packages (``crates'') from the
+most popular projects, as defined by number of downloads from Crates.io and
+number of stars on GitHub, for analysis.~\footnote{Source code for the analysis
+  as well as listings of the repositories are available \fixme{on the moon}.} Of
+the initially selected repositories only about 1 000 were from other sources
+than GitHub. Only crates that compiled under recent versions of Rust nightly
+builds with non-linear lifetimes enabled were kept. The source code of the
+packages was then translated to Polonius input files for a total of
+\fixme{186GB}~of tab-separated tuples, which I used to measure Polonius
+solve-time performance as well as for finding common patterns in the input data.
+Only complete data sets were considered; a repository with more than one target
+where at least one target did not compile was discarded, as was any repository
+with more than 8GB~of input data for any relation, or where fact generation took
+longer than 15~minutes due to RAM- and time constraints. After this selection
+process, \fixme{10 000} repositories remained for the final study.
+
+% what do we want to know?
+% what are our proxy variables?
+% on what type of machine was the analysis performed?
 
 \section{Optimising the Borrow Checker}\label{sec:optim-borr-check}
+
+% known problem with large static arrays
 
 % implied constraints, symmetries, optimisations
 
