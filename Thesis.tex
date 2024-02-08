@@ -192,7 +192,7 @@ allocated on the heap.
 This report describes the implementation of Rust's memory safety checker, called
 the borrow checker, in an embedded Datalog engine, as well as its optimisation.
 
-% FIXME mention results
+\fixme{mention results.}
 
 \chapter{Background}
 Whenever a reference to a resource is created in Rust, its borrowing rules
@@ -345,8 +345,8 @@ the reference, \InRust{p}, cannot outlive the assigned value, \InRust{x}. More
 formally the type of the right-hand side, \InRust{&'a i32}, must be a subtype of
 the left-hand side's type; \InRust{&'a i32 <: &'b i32}. In practice, this
 establishes that \InRust{'b} lives at most as long as \InRust{'a}, which means
-that the subtyping rules for regions establishes a set membership constraint, as
-seen in Formula~\ref{eq:subtype}.
+that the subtyping rules for regions establishes a set membership constraint
+between the regions, as seen in Formula~\ref{eq:subtype}.
 
 \begin{equation}\label{eq:subtype}
 \ntyperule{a \subseteq b}{\InRust{&'a u32} <: \InRust{&'b u32}}
@@ -359,7 +359,7 @@ mean that $r$ occurs (\fixme{what does occurs mean? Does it encompass exploded
   subset-types etc?}) in the type of a variable that is live at some point in the
 control-flow graph $p$, with the meaning that any of the loans in $r$ might be
 dereferenced at control-flow points reachable from $p$, and thus that the terms of
-the loans in $r$ must be respected.
+the loans in $r$ must be respected at that point.
 
 
 \section{Deallocation As a Special Case of Variable Use}
@@ -371,7 +371,7 @@ the loans in $r$ must be respected.
 
 \fixme{Describe datalog's syntax and execution model.}
 
-\chapter{A Borrow Checker in Datalog}
+\chapter{A Datalog Model for the Rust Borrow Checker}
 \label{cha:investigation}
 % \epigraph{\fixme{short quote}}
 
