@@ -16,8 +16,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-% \documentclass{UUThesisTemplate}
-\documentclass[11pt,a4paper,twoside,openany]{book}
+\documentclass{UUThesisTemplate}
+%\documentclass[11pt,a4paper,twoside,openany]{report}
 
 \author{Albin Stjerna}
 \date{\today}
@@ -34,10 +34,10 @@
 	%\setotherlanguages{swedish}
 
 	% Font settings
-	%\setmainfont{Times New Roman}
-        %\setromanfont{Times New Roman}
-	%\setsansfont{Arial}
-	%\setmonofont{Courier New}
+	\setmainfont{Baskerville}
+  \setromanfont{Baskerville}
+	\setsansfont{Helvetica Neue}
+	\setmonofont{Source Code Pro}
 \else
 	% Plain LaTeX specific packages and settings
 	% Language, diacritics and hyphenation
@@ -64,6 +64,7 @@
 \usepackage{tabularx}
 \usepackage{bm}
 \usepackage{longtable}
+\usepackage{lipsum}
 
 \clubpenalty 4000
 \widowpenalty 4000
@@ -82,14 +83,12 @@
 \bibliography{../bibliography.bib}
 
 % Numbering of headings down to the subsection level
-%\numberingdepth{subsection}
+\numberingdepth{subsection}
 
 % Including headings down to the subsection level in contents
 %\contentsdepth{subsection}
 
 \setlength{\columnsep}{0.2cm}
-
-\usepackage{csquotes}
 \usepackage{pdfpages}
 \usepackage{amsmath}
 \usepackage{varioref}
@@ -97,9 +96,16 @@
 %\usepackage{cleveref}
 \usepackage[toc,page]{appendix}
 \newcommand{\fixme}[1] {{\color{red}#1}}
+\usepackage{microtype}
+\usepackage[newfloat]{minted}
+\usepackage{csquotes}
+\usemintedstyle{xcode}
+\setminted{fontsize=\footnotesize}
 
 \setnowidow[5]
 \setnoclub[3]
+
+\newcommand{\InRust}[1]{\mintinline{rust}{#1}}
 
 % Uncomment to use a custom abstract dummy text
 %\abstractdummy{
@@ -107,15 +113,14 @@
 
 \title{A Dataflow Approach to Reference Ownership Analysis for the Rust Programming Language}
 
-
 \begin{document}
-\frontmatter
-    % Creates the front matter (title page(s), abstract, list of papers)
-    % for either a Comprehensive Summary or a Monograph.
-    % Authors of Comprehensive Summaries use this front matter
-    %\frontmatterCS
-    % Monograph authors use this front matter
-    %\frontmatterMonograph
+% %\frontmatter*
+%     % Creates the front matter (title page(s), abstract, list of papers)
+%     % for either a Comprehensive Summary or a Monograph.
+%     % Authors of Comprehensive Summaries use this front matter
+%     %\frontmatterCS
+%     % Monograph authors use this front matter
+%     %\frontmatterMonograph
 
     % Environment used to create a list of papers
     % \begin{listofpapers}
@@ -124,48 +129,151 @@
 
 \maketitle
 
-    \chapter*{Abstract}
-    \textit{\fixme{This thesis is about something.}}
+\section*{Abstract}
+\textit{\fixme{This thesis is about something.}}
 
 
-    \begingroup
+\begingroup
         % To adjust the indentation in your table of contents, uncomment and enter the widest numbers for each level
         %  E.g.  \settocnumwidth{widest chapter number}{widest section number}{widest subsection number}...{...}
        %  \settocnumwidth{5}{4}{5}{3}{3}{3}
-    \tableofcontents
-    \listoffigures
-    \listoftables
-    \endgroup
+  \tableofcontents
+  \listoffigures
+  % \listoftables
+\endgroup
+  
+%\section*{Acknowledgements}
+%\fixme{I thank everyone for everything.}
 
-    % Optional tables
-    %\listoftables
-    %\listoffigures
+\chapter{Introduction}
+%\epigraph{\fixme{short quote}}
+%\mainmatter{}
+% what are the contributions made?
+% why?
 
-    \chapter{Acknowledgements}
-    \fixme{I thank everyone for everything.}
+Rust is a young systems language originally developed at Mozilla
+Research~\cite{matsakis_rust_2014}. Its stated intention is to combine
+high-level programming language features like automatic memory management and
+strong safety guarantees, in particular in the presence of concurrency or
+parallellism, with predictable performance and pay-as-you-go abstractions in the
+style of C++ and similar systems languages.
 
-    \part{Introduction}
-    \mainmatter{}
-    \chapter{Background}
-    \chapter{Research questions}
-    \chapter{Method}
-    \chapter{Related Work}
+One of its core features is the memory ownership model, which enables
+compile-time safety guarantees against data races, unsafe pointer dereferencing,
+and runtime-free automatic memory management, including for dynamic memory
+allocated on the heap. This report describes the implementation of Rust's memory
+safety checker, called the borrow checker, in an embedded Datalog engine, as
+well as its optimisation.
 
-\part{Investigation}
+\section{Background}
+Whenever a reference to a resource is created in Rust, its borrowing rules
+described in Section~\ref{sec:borrowing-rules} must be respected for as long as
+the reference is alive, including across function
+calls~\cite{nichols_rust_nodate}. In order to enforce these rules, the Rust
+language treats the scope of a reference, called its lifetime, as part of its
+type, and also provides facilities for the programmer to name and reason about
+them as they would any other type.
 
-\chapter{The Borrow Checker and Rust's Lifetimes}
+Since its release, the Rust compiler has been extended through proposal RFC~2094
+to add support for so-called non-lexical lifetimes (NLLs), allowing the compiler
+to calculate lifetimes of references based on the control-flow graph rather than
+the lexical scopes of variables~\cite{noauthor_rfc_2019}. During the spring of
+2018, Nicholas Matsakis began experimenting with a new formulation of the borrow
+checker, called Polonius, using rules written in
+Datalog~\cite{matsakis_alias-based_2018}. The intention was to use Datalog to
+allow for a more advanced analysis while also allowing for better compile-time
+performance through the advances done centrally to the fix point solving
+provided by the Datalog engine used for the computations~\cite{datafrog}.
 
-\chapter{Extending the Borrow Checker}
+Formally, the semantics of Rust's lifetime rules has been captured in the
+language Oxide, described by
+\citeauthor{weiss_oxide:_2019}~\cite{weiss_oxide:_2019}.
 
-\chapter{A Survey of Common Borrow-Check Patterns}
+% describe what others have done
+% describe what was already there
 
-\chapter{Benchmarking and Optimising the Borrow-Check}
+\section{The Borrowing Rules}\label{sec:borrowing-rules}
 
-\part{Conclusions and Future Work}
+\begin{description}
+  
+\item[Variables must be provably initialised before use] Whenever a variable is
+  used, the compiler must be able to tell that it is guaranteed to be
+  initialised:
+  \begin{minted}{rust}
+     let x: u32;
+     let y = x + 1; // ERROR: x is not initialised
+  \end{minted}
+\item[A move deinitialises a variable] Whenever ownership of a variable is
+  passed on (a \emph{move} in Rust parlance), e.g. by a method call or
+  reassignment, the variable becomes deinitialised:
+  \begin{minted}{rust}
+    struct Point(u32, u32);
+    
+    let mut pt = Point(6, 9);
+    let x = pt;
+    let y = pt; // ERROR: pt was already moved to x
+  \end{minted}
+\item[There can be any number of shared references] A reference, also called a
+  \textit{borrow} of a variable, is created with the \InRust{&} operator, and
+  there can be any number of references to a variable:
+  \begin{minted}{rust}
+    struct Point(u32, u32);
+    
+    let mut pt = Point(6, 9);
+    let x = &pt;
+    let y = &pt; // This is fine
+  \end{minted}
+\item[There can only be one simultaneous live unique reference] Whenever a
+  unique reference is created, with \InRust{& mut}, it must be unique:
+  \begin{minted}{rust}
+    struct Point(u32, u32);
+    
+    let mut pt = Point(6, 9);
+    let x = &mut pt;
+    let y = &mut pt; // ERROR: pt is already borrowed
+    
+    // code that uses x and y
+  \end{minted}
+
+  This error happens even if the first borrow is shared, but not if
+  either \InRust{x} or \InRust{y} are dead (not used).
+  
+\item[A reference must not outlive its referent] A reference must go out of
+  scope at the very latest at the same time as its referent, which protects
+  aganst use-after-frees:
+  \begin{minted}{rust}
+    struct Point(u32, u32);
+    
+    let x = {
+        let mut pt = Point(6, 9);
+        &pt
+    };
+    
+    let z = x.0; // ERROR: pt does not live long enough
+  \end{minted}
+
+  In this example, we try to set \InRust{x} to point to the variable \InRust{pt}
+  inside of a block that has gone out of scope before \InRust{x} does.
+\end{description}
+
+\section{From Lifetimes to Reference Provenance}
+
+\chapter{Investigation}
+% \epigraph{\fixme{short quote}}
+
+
+\section{The Borrow Checker in Datalog}
+
+\section{A Field Study of Borrow Patterns}
+
+\section{Optimising the Borrow Checker}
+
+\chapter{Conclusions and Future Work}
+%\epigraph{\fixme{short quote}}
 
 %\begin{appendices}
 %\end{appendices}
 
-\backmatter
+%\backmatter
 \printbibliography[heading=bibintoc]
 \end{document}
